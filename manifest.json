@@ -1,0 +1,16 @@
+{
+  "name": "MediCare RME - Praktek dr. Reza Ariandes",
+  "short_name": "MediCare RME",
+  "description": "Rekam Medis Elektronik Praktik Mandiri",
+  "start_url": "https://rezaariandes.github.io/rme/index.html",
+  "display": "standalone",
+  "background_color": "#f0f4ff",
+  "theme_color": "#1a6bff",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
