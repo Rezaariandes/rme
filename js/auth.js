@@ -1,26 +1,44 @@
 // ════════════════════════════════════════════════════════
 //  KLIKPRO RME — AUTENTIKASI PIN
-//  Mengelola layar kunci PIN dan sesi login user
+//  Mengelola layar kunci PIN dan sesi login user (Expire: 3 Jam)
 // ════════════════════════════════════════════════════════
 
 let currentPinInput = "";
 let loggedInUser = null; // { nama, jabatan }
 
-// ── INISIALISASI PIN LOCK ──
+// ── INISIALISASI PIN LOCK (CEK SESI 3 JAM) ──
 function initPinLock() {
-    if (sessionStorage.getItem('is_unlocked') === 'true') {
+    const isUnlocked = localStorage.getItem('is_unlocked');
+    const expiryTime = localStorage.getItem('session_expiry');
+    const now = Date.now();
+
+    // Cek apakah ada sesi dan waktunya belum melewati 3 jam
+    if (isUnlocked === 'true' && expiryTime && now < parseInt(expiryTime)) {
         $('pinScreen').style.display = 'none';
+        
         // Pulihkan identitas dari localStorage
         if (localStorage.getItem('rme_drName')) {
             $('drName').innerText = localStorage.getItem('rme_drName');
         }
+        
         // Pulihkan objek user dari sesi
         try {
-            loggedInUser = JSON.parse(sessionStorage.getItem('logged_user') || 'null');
+            loggedInUser = JSON.parse(localStorage.getItem('logged_user') || 'null');
         } catch (e) { loggedInUser = null; }
+        
+        // (Opsional) Jika ingin memperpanjang waktu 3 jam setiap kali user refresh/buka tab baru
+        // localStorage.setItem('session_expiry', now + (3 * 60 * 60 * 1000));
+        
         applyRoleRestrictions();
         return;
+    } else {
+        // Jika sesi tidak ada atau sudah kedaluwarsa (> 3 jam), bersihkan data
+        localStorage.removeItem('is_unlocked');
+        localStorage.removeItem('logged_user');
+        localStorage.removeItem('session_expiry');
     }
+
+    // Tampilkan layar PIN jika tidak valid
     $('pinScreen').style.display = 'flex';
     
     // Panggil fungsi untuk mengisi dropdown user saat layar login muncul
@@ -102,8 +120,14 @@ async function checkPinServer() {
 
         if (data.isValid) {
             loggedInUser = data.user; // { nama, jabatan }
-            sessionStorage.setItem('is_unlocked', 'true');
-            sessionStorage.setItem('logged_user', JSON.stringify(loggedInUser));
+            
+            // Hitung waktu kedaluwarsa: Sekarang + (3 Jam x 60 Menit x 60 Detik x 1000 Milidetik)
+            const expiryTime = Date.now() + (3 * 60 * 60 * 1000);
+
+            // Simpan sesi ke localStorage
+            localStorage.setItem('is_unlocked', 'true');
+            localStorage.setItem('logged_user', JSON.stringify(loggedInUser));
+            localStorage.setItem('session_expiry', expiryTime);
 
             if (data.user) {
                 const finalName = data.user.nama + " (" + data.user.jabatan + ")";
@@ -169,9 +193,12 @@ function applyRoleRestrictions() {
 
 // ── LOGOUT PENGGUNA ──
 function logout() {
-    sessionStorage.removeItem('is_unlocked');
-    sessionStorage.removeItem('logged_user');
+    // Bersihkan semua sesi dari localStorage
+    localStorage.removeItem('is_unlocked');
+    localStorage.removeItem('logged_user');
+    localStorage.removeItem('session_expiry');
     localStorage.removeItem('rme_drName');
+    
     if (typeof clearSession === 'function') clearSession();
     location.reload();
 }
