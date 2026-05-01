@@ -12,10 +12,7 @@ async function fetchUsers() {
     try {
         const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify({ action: "getUsers" }) });
         const data = await res.json();
-        
-        // PERBAIKAN: Mengambil array dari data.data (sesuai output Google Apps Script)
         userListCache = data.data || data.users || []; 
-        
         renderUserList();
     } catch (e) {
         listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Gagal memuat daftar user.</div>`;
@@ -63,9 +60,7 @@ async function simpanUserBaru() {
         $('u_nama').value    = '';
         $('u_jabatan').value = 'Admin';
         $('u_pin').value     = '';
-        fetchUsers(); // Refresh daftar setelah save
-        
-        // Coba sinkronisasi juga layar login PIN jika belum direfresh
+        fetchUsers(); 
         if (typeof loadLoginUsers === "function") loadLoginUsers();
     } catch (e) {
         showToast("❌ Gagal menyimpan user", "error");
@@ -82,7 +77,7 @@ function openEditUserModal(id) {
     $('edit_u_id').value      = u.id;
     $('edit_u_nama').value    = u.nama;
     $('edit_u_jabatan').value = u.jabatan;
-    $('edit_u_pin').value     = u.pin || ''; // Hindari undefined jika PIN tidak dikirim ke frontend
+    $('edit_u_pin').value     = u.pin || ''; 
     $('modalUser').classList.add('show');
 }
 
@@ -112,7 +107,9 @@ async function updatePinUser() {
     }
 }
 
-// Panggil fungsi secara otomatis saat file dimuat agar daftar langsung tersedia
-document.addEventListener("DOMContentLoaded", () => {
+// ── PERBAIKAN: Langsung eksekusi jika dipanggil via fetch ──
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", fetchUsers);
+} else {
     fetchUsers();
-});
+}

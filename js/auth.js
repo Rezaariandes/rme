@@ -169,17 +169,10 @@ function applyRoleRestrictions() {
 
 // ── LOGOUT PENGGUNA ──
 function logout() {
-    // Hapus sesi autentikasi
     sessionStorage.removeItem('is_unlocked');
     sessionStorage.removeItem('logged_user');
-    
-    // Hapus tampilan nama dari localStorage
     localStorage.removeItem('rme_drName');
-    
-    // Opsional: bersihkan sesi medis berjalan (agar perawat baru tidak lihat data sisa)
     if (typeof clearSession === 'function') clearSession();
-    
-    // Refresh halaman untuk memuat ulang sistem dari awal
     location.reload();
 }
 
@@ -196,4 +189,9 @@ function canAccessMedis() {
     return true;
 }
 
-document.addEventListener("DOMContentLoaded", () => { initPinLock(); });
+// ── PERBAIKAN: Langsung eksekusi jika dipanggil via fetch ──
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", initPinLock);
+} else {
+    initPinLock();
+}
