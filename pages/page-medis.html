@@ -1,0 +1,66 @@
+<div id="pageMedis" class="page">
+        <div class="card">
+            <div class="card-body">
+                <div class="pasien-banner">
+                    <div>
+                        <strong id="infoPasienNama" style="font-size:16px;color:var(--primary-dark);display:block;">—</strong>
+                        <span id="infoPasienNik" style="font-size:11px;color:var(--text-muted);">NIK: —</span>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <div id="infoTglPemeriksaan" class="pasien-badge" style="background:var(--success);display:none;">Tgl: -</div>
+                        <div id="infoPasienUmur" class="pasien-badge">Umur: -</div>
+                    </div>
+                </div>
+
+                <!-- WRAPPER TTV -->
+                <div id="sectionTTV">
+                    <div class="section-divider"><span>🩺 Tanda-Tanda Vital</span></div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-sm-4">
+                            <div class="ttv-item d-flex align-items-center w-100">
+                                <div class="flex-fill position-relative"><label>Sistol</label><input type="number" id="sistol" placeholder="120" data-save="true"><span class="high-alert">!</span></div>
+                                <div class="ttv-sep">/</div>
+                                <div class="flex-fill position-relative"><label>Diastol</label><input type="number" id="diastol" placeholder="80" data-save="true"><span class="high-alert">!</span></div>
+                            </div>
+                        </div>
+                        <div class="col-4 col-sm-2"><div class="ttv-item"><label>Nadi</label><input type="number" id="nadi" placeholder="80" data-save="true"></div></div>
+                        <div class="col-4 col-sm-2"><div class="ttv-item"><label>Suhu</label><input type="number" id="suhu" placeholder="36.5" step="0.1" data-save="true"></div></div>
+                        <div class="col-4 col-sm-2"><div class="ttv-item"><label>RR</label><input type="number" id="rr" placeholder="20" data-save="true"></div></div>
+                        <div class="col-6 col-sm-2"><div class="ttv-item"><label>BB (kg)</label><input type="number" id="bb" placeholder="60" data-save="true"></div></div>
+                        <div class="col-6 col-sm-2"><div class="ttv-item"><label>TB (cm)</label><input type="number" id="tb" placeholder="165" data-save="true"></div></div>
+                    </div>
+                    <div id="imtCalc" style="text-align:right;font-size:11px;font-weight:700;color:var(--primary);margin-top:2px;margin-bottom:12px;padding-right:4px;"></div>
+                </div>
+
+                <!-- WRAPPER DATA KLINIS -->
+                <div id="sectionKlinis">
+                    <div class="section-divider"><span>📋 Data Klinis</span></div>
+                    <div class="form-group">
+                        <label class="form-label">Keluhan Utama</label><textarea id="keluhan" class="form-control" data-save="true" placeholder="Tuliskan keluhan pasien..." rows="2"></textarea><button class="stt-btn" onclick="startSTT('keluhan')">🎙️</button>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pemeriksaan Fisik</label><textarea id="fisik" class="form-control" data-save="true" placeholder="Hasil pemeriksaan fisik..." rows="2"></textarea><button class="stt-btn" onclick="startSTT('fisik')">🎙️</button>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6"><label class="form-label">Diagnosa Utama</label><input list="list-icd" id="diagnosa" class="form-control" data-save="true" placeholder="Diagnosa..."></div>
+                        <div class="col-6"><label class="form-label">Diagnosa 2</label><input list="list-icd" id="diagnosa2" class="form-control" data-save="true" placeholder="Sekunder..."></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Terapi & Obat</label><textarea id="terapi" class="form-control" data-save="true" placeholder="Resep dan terapi..." rows="2"></textarea><button class="stt-btn" onclick="startSTT('terapi')">🎙️</button>
+                    </div>
+                    <div style="margin:12px 0 16px;display:flex;align-items:center;gap:8px;">
+                        <input type="checkbox" id="suratSakit" style="width:16px;height:16px;accent-color:var(--danger);"><label for="suratSakit" style="font-size:12px;font-weight:700;color:var(--danger);cursor:pointer;">Pasien meminta Surat Sakit</label>
+                    </div>
+                </div>
+
+                <button onclick="saveAll()" id="btnSave" class="btn-custom btn-success-custom w-100 mt-2">✓ Simpan Rekam Medis</button>
+                <a href="#" onclick="resetSession(); return false;" class="cancel-link">✕ Batalkan & Kembali</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header-section">📁 Riwayat Pasien</div>
+            <div class="card-body" id="historyListMedis">
+                <div class="empty-state"><div class="empty-icon">📂</div>Menunggu data...</div>
+            </div>
+        </div>
+    </div>
