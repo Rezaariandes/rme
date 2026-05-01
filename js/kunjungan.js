@@ -154,10 +154,17 @@ async function bukaRekamMedisHariIni(kId) {
 
 // ── SIMPAN REKAM MEDIS ──
 async function saveAll() {
-    const d1      = $('diagnosa').value;
-    const d2      = $('diagnosa2').value;
+    const d1      = $('diagnosa').value.trim();
+    const d2      = $('diagnosa2').value.trim();
+    const terapi  = $('terapi').value.trim();
     const hasData = ['sistol','diastol','nadi','suhu','rr','bb','tb'].some(id => $(id).value !== "");
+    
+    // Validasi input awal
     if (!d1 && !hasData) return showToast("⚠️ Isi Diagnosa Utama atau Tanda Vital!", "error");
+
+    // LOGIKA PERBEDAAN FUNGSI SIMPAN:
+    // Cek apakah diagnosa utama dan terapi sudah diisi (menandakan pasien selesai dilayani Dokter)
+    const isSelesai = (d1 !== "" && terapi !== "");
 
     const btn = $('btnSave');
     btn.disabled = true;
@@ -186,7 +193,7 @@ async function saveAll() {
         td: tdGabungan, nadi: $('nadi').value, rr: $('rr').value,
         suhu: $('suhu').value, bb: $('bb').value, tb: $('tb').value,
         keluhan: $('keluhan').value, fisik: $('fisik').value,
-        diagnosa: diagGabung, terapi: $('terapi').value,
+        diagnosa: diagGabung, terapi: terapi,
         suratSakit: $('suratSakit').checked ? "YA" : "TIDAK"
     };
 
@@ -195,18 +202,34 @@ async function saveAll() {
         const result = await res.json();
 
         if (result && result.status === "Sukses") {
-            showToast("✅ Rekam medis tersimpan!", "success");
-            btn.innerText = "✓ Tersimpan!";
-            clearSession();
-            setTimeout(() => {
-                currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
-                ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
-                if ($('jk')) $('jk').value = 'L';
-                btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis";
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-                document.querySelectorAll('.nav-item')[0].classList.add('active-nav');
-                switchPage('pageDaftar', null);
-            }, 1400);
+            // Jika ID kunjungan baru saja dibuat oleh server, update variabel globalnya
+            if (!currentKunjunganId && result.kunjunganId) {
+                currentKunjunganId = result.kunjunganId;
+            }
+
+            if (isSelesai) {
+                // KONDISI 1: Diagnosa & Terapi terisi -> Pasien Selesai -> Pindah ke Pendaftaran
+                showToast("✅ Rekam medis selesai & tersimpan!", "success");
+                btn.innerText = "✓ Tersimpan!";
+                clearSession();
+                setTimeout(() => {
+                    currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
+                    ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
+                    if ($('jk')) $('jk').value = 'L';
+                    btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis";
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+                    document.querySelectorAll('.nav-item')[0].classList.add('active-nav');
+                    switchPage('pageDaftar', null);
+                }, 1400);
+            } else {
+                // KONDISI 2: Belum Lengkap (Hanya simpan data sementara) -> Tetap di halaman
+                showToast("✅ Data tersimpan sementara", "success");
+                btn.innerText = "✓ Disimpan!";
+                setTimeout(() => {
+                    btn.disabled = false; 
+                    btn.innerText = "✓ Simpan Rekam Medis";
+                }, 1400);
+            }
         } else {
             throw new Error(result.error || "Gagal menyimpan");
         }
