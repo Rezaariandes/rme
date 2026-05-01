@@ -1,0 +1,14 @@
+<div class="modal-overlay" id="modalUser" onclick="if(event.target===this) this.classList.remove('show')">
+        <div class="modal-content">
+            <div style="width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 18px;"></div>
+            <div class="fw-bold text-primary mb-3 pb-2 border-bottom" style="font-size:16px;">✏️ Edit Data User</div>
+            <input type="hidden" id="edit_u_id">
+            <div class="form-group"><label class="form-label">Nama User</label><input type="text" id="edit_u_nama" class="form-control" disabled></div>
+            <div class="form-group"><label class="form-label">Jabatan</label><input type="text" id="edit_u_jabatan" class="form-control" disabled></div>
+            <div class="form-group"><label class="form-label text-danger">Ubah PIN (6 Digit)</label><input type="number" id="edit_u_pin" class="form-control" placeholder="123456" maxlength="6"></div>
+            <div class="d-flex gap-2 mt-4">
+                <button class="btn-custom" style="flex:1;background:#e2e8f0;color:#475569;" onclick="document.getElementById('modalUser').classList.remove('show')">Batal</button>
+                <button class="btn-custom btn-warning-custom" id="btnUpdateUser" style="flex:1;" onclick="updatePinUser()">💾 Update User</button>
+            </div>
+        </div>
+    </div>
