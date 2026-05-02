@@ -57,6 +57,11 @@ async function loadRuntimeSettings() {
         if (h1   && s.klinik_title) h1.innerText   = s.klinik_title;
         if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
 
+        // ── OCR API KEY — dari Settings, bukan hardcoded ──
+        if (s.ocr_api_key && s.ocr_api_key.trim() !== '') {
+            window.OCR_API_KEY = s.ocr_api_key.trim();
+        }
+
         // Update AI Keys — skip jika kosong/[]
         const providers = ['gemini','groq','openrouter','openai','mistral','cohere'];
         providers.forEach(p => {
@@ -159,8 +164,15 @@ async function initApp() {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // Jalankan settings paralel dengan initData agar AI_KEYS cepat tersedia
-    const settingsPromise = loadRuntimeSettings();
+    // ── FIX RACE CONDITION ──
+    // loadRuntimeSettings dijalankan DULU (await), baru initData.
+    // Ini menjamin AI_KEYS & OCR_API_KEY sudah terisi sebelum UI aktif,
+    // sehingga user tidak bisa klik Rekomendasi AI sebelum key tersedia.
+    try {
+        await loadRuntimeSettings();
+    } catch(e) {
+        console.warn('[Klikpro] Settings gagal, lanjut dengan default');
+    }
 
     // Ambil data awal dari server
     try {
@@ -184,8 +196,6 @@ async function initApp() {
         }
 
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
-
-        await settingsPromise;
 
     } catch (e) {
         showToast("⚡ Gagal terhubung ke server. Cek koneksi.", "error");

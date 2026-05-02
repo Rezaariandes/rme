@@ -224,12 +224,19 @@ function resetSession() {
 //  2. Teks hasil OCR di-parse dengan regex KTP Indonesia
 //  3. Field NIK, Nama, Tgl Lahir, JK, Alamat diisi ke form
 //
-//  API Key gratis: https://ocr.space/ocrapi (daftar gratis)
-//  Ganti OCR_SPACE_API_KEY di bawah dengan key Anda.
-//  Key demo "K88888888888888" bisa dipakai untuk testing.
+//  API Key diambil dari Google Sheets Settings (field: ocr_api_key).
+//  Tidak lagi hardcoded — bisa diubah dari halaman ⚙️ Settings.
+//  Fallback: key kosong → tampilkan pesan ke user untuk konfigurasi.
 // ════════════════════════════════════════════════════════
 
-const OCR_SPACE_API_KEY = 'K86019973288957'; // API key OCR.space
+// ── Ambil OCR API Key dari runtime settings ──
+function _getOcrApiKey() {
+    // Diisi oleh loadRuntimeSettings() dari app.js ke window.OCR_API_KEY
+    if (typeof window.OCR_API_KEY === 'string' && window.OCR_API_KEY.trim() !== '') {
+        return window.OCR_API_KEY.trim();
+    }
+    return null;
+}
 
 // ── Resize gambar jika terlalu besar (hemat kuota API) ──
 function resizeImageForAPI(file, maxWidth = 1200) {
@@ -262,10 +269,10 @@ function resizeImageForAPI(file, maxWidth = 1200) {
 }
 
 // ── Kirim gambar ke OCR.space, dapatkan teks mentah ──
-async function ocrSpaceRequest(file) {
+async function ocrSpaceRequest(file, apiKey) {
     const formData = new FormData();
     formData.append('file', file, 'ktp.jpg');
-    formData.append('apikey', OCR_SPACE_API_KEY);
+    formData.append('apikey', apiKey);
     formData.append('language', 'eng');        // 'eng' lebih stabil dari 'ind' di OCR.space
     formData.append('isOverlayRequired', 'false');
     formData.append('detectOrientation', 'true');
@@ -477,8 +484,12 @@ function parseKtpDariTeks(teks) {
 
 // ── Fungsi utama: scan KTP dengan OCR.space ──
 async function scanKtpDenganOcrSpace(file) {
+    const apiKey = _getOcrApiKey();
+    if (!apiKey) {
+        throw new Error('belum dikonfigurasi — Buka ⚙️ Settings → Konfigurasi OCR untuk mengisi API Key OCR.space.');
+    }
     const resized = await resizeImageForAPI(file, 1600); // Sedikit lebih besar untuk akurasi
-    const teksOcr = await ocrSpaceRequest(resized);
+    const teksOcr = await ocrSpaceRequest(resized, apiKey);
 
     if (!teksOcr || teksOcr.trim().length < 5) {
         throw new Error('Teks tidak terbaca dari gambar. Pastikan foto KTP jelas & tidak buram.');
@@ -562,8 +573,10 @@ function initScanKtp() {
         } catch (err) {
             console.error('[KTP OCR.space Error]', err);
 
-            if (err.message.includes('401') || err.message.includes('403')) {
-                showToast('❌ API Key OCR.space tidak valid. Cek konfigurasi.', 'error');
+            if (err.message.includes('belum dikonfigurasi')) {
+                showToast('⚙️ OCR API Key ' + err.message, 'warning');
+            } else if (err.message.includes('401') || err.message.includes('403')) {
+                showToast('❌ API Key OCR.space tidak valid. Periksa di ⚙️ Settings.', 'error');
             } else if (err.message.includes('429') || err.message.includes('limit')) {
                 showToast('⚠️ Kuota OCR.space habis. Coba lagi nanti atau upgrade plan.', 'warning');
             } else if (err.message.includes('tidak terbaca')) {

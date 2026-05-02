@@ -6,6 +6,46 @@
 let kunjunganHariIni   = [];
 let currentKunjunganId = null;
 
+// ════════════════════════════════════════════════════════
+//  VALIDASI NILAI TANDA VITAL
+//  Rentang absolut yang masih physiologically possible
+// ════════════════════════════════════════════════════════
+const VITAL_RULES = {
+    sistol:   { min: 50,  max: 300, label: 'Sistol',       unit: 'mmHg' },
+    diastol:  { min: 30,  max: 200, label: 'Diastol',      unit: 'mmHg' },
+    nadi:     { min: 20,  max: 300, label: 'Nadi',         unit: 'x/mnt' },
+    suhu:     { min: 30,  max: 45,  label: 'Suhu',         unit: '°C' },
+    rr:       { min: 5,   max: 60,  label: 'Laju Napas',   unit: 'x/mnt' },
+    bb:       { min: 1,   max: 300, label: 'Berat Badan',  unit: 'kg' },
+    tb:       { min: 30,  max: 250, label: 'Tinggi Badan', unit: 'cm' },
+    lab_gds:  { min: 20,  max: 800, label: 'GDS',          unit: 'mg/dL' },
+    lab_chol: { min: 50,  max: 800, label: 'Kolesterol',   unit: 'mg/dL' },
+    lab_ua:   { min: 1,   max: 20,  label: 'Asam Urat',    unit: 'mg/dL' },
+};
+
+function validasiNilaiVital() {
+    const errors = [];
+    Object.entries(VITAL_RULES).forEach(([id, rule]) => {
+        const el = $(id);
+        if (!el || el.value === '') return; // boleh kosong
+        const val = parseFloat(el.value);
+        if (isNaN(val)) {
+            errors.push(`${rule.label}: bukan angka valid`);
+            return;
+        }
+        if (val < rule.min || val > rule.max) {
+            errors.push(`${rule.label}: ${val} ${rule.unit} (rentang valid: ${rule.min}–${rule.max})`);
+        }
+    });
+    // Validasi silang: sistol harus > diastol
+    const sis = parseFloat($('sistol')?.value  || '');
+    const dia = parseFloat($('diastol')?.value || '');
+    if (!isNaN(sis) && !isNaN(dia) && sis <= dia) {
+        errors.push(`Tekanan darah tidak valid: Sistol (${sis}) harus lebih besar dari Diastol (${dia})`);
+    }
+    return errors;
+}
+
 // ── AMBIL DATA KUNJUNGAN BERDASARKAN TANGGAL ──
 async function fetchByDate() {
     const filterEl = $('filterDate');
@@ -155,6 +195,18 @@ async function saveAll() {
     const hasData = ['sistol','diastol','nadi','suhu','rr','bb','tb','lab_gds','lab_chol','lab_ua'].some(id => $(id) && $(id).value !== "");
 
     if (!d1 && !hasData) return showToast("⚠️ Isi Diagnosa Utama atau Tanda Vital!", "error");
+
+    // ── VALIDASI NILAI VITAL ──
+    const vErrors = validasiNilaiVital();
+    if (vErrors.length > 0) {
+        showToast("⚠️ " + vErrors[0], "error");
+        if (vErrors.length > 1) {
+            vErrors.slice(1).forEach((msg, i) => {
+                setTimeout(() => showToast("⚠️ " + msg, "error"), (i + 1) * 800);
+            });
+        }
+        return;
+    }
 
     const isSelesai = (d1 !== "" && terapi !== "");
     const btn = $('btnSave');
