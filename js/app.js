@@ -58,18 +58,22 @@ async function loadRuntimeSettings() {
         if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
 
         // Update AI Keys — hanya overwrite jika array tidak kosong
+        // BUG FIX: "[]" adalah truthy tapi tidak boleh menimpa key yang ada
         const providers = ['gemini','groq','openrouter','openai','mistral','cohere'];
         providers.forEach(p => {
-            const raw = s[`ai_${p}`];
-            if (raw && typeof raw === 'string' && raw.trim() !== '' && raw.trim() !== '[]') {
-                try {
-                    const keys = JSON.parse(raw);
-                    if (Array.isArray(keys) && keys.length > 0 && typeof AI_KEYS !== 'undefined') {
-                        AI_KEYS[p] = keys;
-                        console.log('[Klikpro] AI key loaded: ' + p + ' (' + keys.length + ' key)');
+            const rawKey = s[`ai_${p}`];
+            if (rawKey && typeof rawKey === 'string') {
+                const trimmed = rawKey.trim();
+                if (trimmed !== '' && trimmed !== '[]') {
+                    try {
+                        const keys = JSON.parse(trimmed);
+                        if (Array.isArray(keys) && keys.length > 0 && typeof AI_KEYS !== 'undefined') {
+                            AI_KEYS[p] = keys;
+                            console.log('[Klikpro] AI key loaded: ' + p + ' (' + keys.length + ' key)');
+                        }
+                    } catch(e) {
+                        console.warn('[Klikpro] Gagal parse AI key ' + p + ':', e.message);
                     }
-                } catch(e) {
-                    console.warn('[Klikpro] Gagal parse AI key ' + p + ':', e.message);
                 }
             }
         });
@@ -158,11 +162,11 @@ async function initApp() {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // Ambil data awal & settings secara PARALEL agar AI Keys siap lebih cepat
-    // BUG FIX: loadRuntimeSettings dijalankan bersamaan dengan initData (tidak serial)
-    // sehingga AI_KEYS sudah terisi sebelum user sempat klik tombol Rekomendasi AI
+    // BUG FIX: Jalankan loadRuntimeSettings PARALEL dengan initData
+    // agar AI_KEYS sudah siap saat user pertama kali membuka halaman medis
     const settingsPromise = loadRuntimeSettings();
 
+    // Ambil data awal dari server
     try {
         const res  = await fetch(APP_URL, {
             method: 'POST',
@@ -185,7 +189,7 @@ async function initApp() {
 
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
 
-        // Tunggu settings selesai juga (sudah berjalan paralel sejak awal)
+        // BUG FIX: settings sudah dimuat paralel di awal, tinggal tunggu selesai
         await settingsPromise;
 
     } catch (e) {

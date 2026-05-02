@@ -431,9 +431,9 @@ async function rekomendasiAI() {
     if (!adaKey) {
         if (notif && notifTxt) {
             notifTxt.innerHTML =
-                `<span style="color:#b45309;">⚙️ <b>Belum ada API Key AI.</b><br>` +
-                `Buka menu <b>⚙️ Settings → API Key AI</b> dan isi minimal 1 key.<br>` +
-                `<span style="font-size:10px;opacity:.8;">Provider gratis: Gemini (aistudio.google.com) · Groq (console.groq.com) · OpenRouter (openrouter.ai)</span></span>`;
+                '<span style="color:#b45309;">⚙️ <b>API Key AI belum dimuat.</b><br>' +
+                'Buka <b>⚙️ Settings → Konfigurasi AI API Keys</b> dan pastikan key sudah terisi.<br>' +
+                '<span style="font-size:10px;opacity:.8;">Provider gratis: Groq · Gemini · OpenRouter</span></span>';
             notif.style.display = 'flex';
         }
         return;
