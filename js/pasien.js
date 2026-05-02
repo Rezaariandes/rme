@@ -220,7 +220,7 @@ function resetSession() {
 //  Key demo "K88888888888888" bisa dipakai untuk testing.
 // ════════════════════════════════════════════════════════
 
-const OCR_SPACE_API_KEY = 'K88888888888888'; // Ganti dengan API key Anda dari ocr.space
+const OCR_SPACE_API_KEY = 'K86019973288957'; // API key OCR.space
 
 // ── Resize gambar jika terlalu besar (hemat kuota API) ──
 function resizeImageForAPI(file, maxWidth = 1200) {
@@ -257,11 +257,12 @@ async function ocrSpaceRequest(file) {
     const formData = new FormData();
     formData.append('file', file, 'ktp.jpg');
     formData.append('apikey', OCR_SPACE_API_KEY);
-    formData.append('language', 'ind');        // Bahasa Indonesia
+    formData.append('language', 'eng');        // 'eng' lebih stabil dari 'ind' di OCR.space
     formData.append('isOverlayRequired', 'false');
     formData.append('detectOrientation', 'true');
-    formData.append('scale', 'true');          // Tingkatkan akurasi gambar kecil
-    formData.append('OCREngine', '2');         // Engine 2 lebih akurat untuk dokumen
+    formData.append('scale', 'true');
+    formData.append('isTable', 'true');        // KTP berbentuk tabel, aktifkan mode ini
+    formData.append('OCREngine', '2');
 
     const response = await fetch('https://api.ocr.space/parse/image', {
         method: 'POST',
@@ -272,14 +273,22 @@ async function ocrSpaceRequest(file) {
 
     const result = await response.json();
 
+    // ── DEBUG: Tampilkan respons lengkap di console ──
+    console.log('[OCR.space] Full response:', JSON.stringify(result, null, 2));
+
     if (result.IsErroredOnProcessing) {
-        throw new Error('OCR gagal: ' + (result.ErrorMessage?.[0] || 'Unknown error'));
+        const errMsg = Array.isArray(result.ErrorMessage)
+            ? result.ErrorMessage.join(', ')
+            : (result.ErrorMessage || 'Unknown error');
+        throw new Error('OCR gagal: ' + errMsg);
     }
 
-    // Gabungkan semua teks dari semua halaman/blok
     const allText = (result.ParsedResults || [])
         .map(r => r.ParsedText || '')
         .join('\n');
+
+    // ── DEBUG: Tampilkan teks mentah OCR ──
+    console.log('[OCR.space] Teks mentah:\n' + allText);
 
     return allText;
 }
@@ -292,15 +301,20 @@ function toTitleCase(str) {
 // ── Normalisasi tanggal dari berbagai format ke DD/MM/YYYY ──
 function normalisasiTanggal(raw) {
     if (!raw) return null;
-    // Format: 01-01-1990, 01/01/1990, 01 01 1990
+    raw = raw.trim();
+
+    // Format angka: 01-01-1990 / 01/01/1990 / 01 01 1990
     const m = raw.match(/(\d{1,2})[-\/\s](\d{1,2})[-\/\s](\d{4})/);
-    if (m) {
-        return m[1].padStart(2,'0') + '/' + m[2].padStart(2,'0') + '/' + m[3];
-    }
-    // Format: 01 Januari 1990
+    if (m) return m[1].padStart(2,'0') + '/' + m[2].padStart(2,'0') + '/' + m[3];
+
+    // Format teks: 01 Januari 1990
     const bulanMap = {
-        januari:'01',februari:'02',maret:'03',april:'04',mei:'05',juni:'06',
-        juli:'07',agustus:'08',september:'09',oktober:'10',november:'11',desember:'12'
+        januari:'01', februari:'02', maret:'03', april:'04',
+        mei:'05', juni:'06', juli:'07', agustus:'08',
+        september:'09', oktober:'10', november:'11', desember:'12',
+        // Singkatan umum hasil OCR
+        jan:'01', feb:'02', mar:'03', apr:'04', jun:'06',
+        jul:'07', agt:'08', agu:'08', sep:'09', okt:'10', nov:'11', des:'12'
     };
     const m2 = raw.toLowerCase().match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
     if (m2 && bulanMap[m2[2]]) {
@@ -309,94 +323,156 @@ function normalisasiTanggal(raw) {
     return null;
 }
 
+// ── Bersihkan label dari awal baris ──
+function hapusLabel(str) {
+    // Hapus pola "LABEL :" atau "LABEL:" atau "LABEL " di awal
+    return str.replace(/^[A-Za-z\s\/\(\)]{1,30}[:]\s*/i, '').trim();
+}
+
 // ── Parse teks OCR menjadi data KTP terstruktur ──
 function parseKtpDariTeks(teks) {
-    const lines = teks.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    const upper = teks.toUpperCase();
+    // Normalisasi: ganti tab dengan spasi, hapus baris kosong berlebih
+    const teksNorm = teks.replace(/\t/g, ' ').replace(/\r/g, '');
+    const lines    = teksNorm.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+    const upper    = teksNorm.toUpperCase();
 
     const result = { nik: null, nama: null, tgl_lahir: null, jk: null, alamat: null };
 
-    // ── NIK: 16 digit angka berurutan ──
-    const nikMatch = teks.match(/\b(\d{16})\b/);
-    if (nikMatch) result.nik = nikMatch[1];
+    console.log('[KTP Parser] Jumlah baris:', lines.length);
+    lines.forEach((l, i) => console.log(`  [${i}] ${l}`));
 
-    // ── Nama: baris setelah label NAMA ──
-    const namaLineIdx = lines.findIndex(l => /^nama\b/i.test(l));
-    if (namaLineIdx !== -1) {
-        // Ambil nilai di baris yang sama setelah ":" atau baris berikutnya
-        const namaLine = lines[namaLineIdx];
-        const afterColon = namaLine.replace(/^nama\s*[:\-]?\s*/i, '').trim();
-        if (afterColon.length > 2) {
-            result.nama = toTitleCase(afterColon);
-        } else if (lines[namaLineIdx + 1]) {
-            // Nilai ada di baris berikutnya (format KTP umumnya begini)
-            const nextLine = lines[namaLineIdx + 1];
-            if (!/^(nik|tempat|tanggal|jenis|gol|agama|status|pekerjaan|kewarganegaraan|alamat|rt|rw|kel|kec|kota|kab|provinsi)/i.test(nextLine)) {
-                result.nama = toTitleCase(nextLine.replace(/[^a-zA-Z\s]/g, '').trim());
+    // ════════════════════════════
+    //  NIK — 16 digit, cari di mana saja
+    // ════════════════════════════
+    // Cari dari baris berlabel NIK dulu
+    for (let i = 0; i < lines.length; i++) {
+        if (/\bnik\b/i.test(lines[i])) {
+            // Nilai bisa di baris yang sama atau baris berikutnya
+            const inline = lines[i].replace(/\bnik\b\s*[:\-]?\s*/i, '').replace(/\D/g, '');
+            if (inline.length >= 14) { result.nik = inline.slice(0, 16); break; }
+            if (i + 1 < lines.length) {
+                const next = lines[i + 1].replace(/\D/g, '');
+                if (next.length >= 14) { result.nik = next.slice(0, 16); break; }
             }
         }
     }
-    // Fallback: cari baris teks kapital panjang yang bukan label
+    // Fallback: cari blok 16 digit di mana saja (toleran spasi di tengah)
+    if (!result.nik) {
+        const noSpace = teksNorm.replace(/\s/g, '');
+        const m = noSpace.match(/\d{16}/);
+        if (m) result.nik = m[0];
+    }
+    // Fallback lebih longgar: 14-16 digit berurutan
+    if (!result.nik) {
+        const m = teksNorm.match(/\b(\d{14,16})\b/);
+        if (m) result.nik = m[1].padStart(16, '0').slice(0, 16);
+    }
+
+    // ════════════════════════════
+    //  NAMA — cari label NAMA
+    // ════════════════════════════
+    for (let i = 0; i < lines.length; i++) {
+        if (/^nama\b/i.test(lines[i])) {
+            const inline = lines[i].replace(/^nama\s*[:\-]?\s*/i, '').trim();
+            if (inline.length > 2 && /[a-zA-Z]/.test(inline)) {
+                result.nama = toTitleCase(inline.replace(/[^a-zA-Z\s\.']/g, '').trim());
+                break;
+            }
+            // Baris berikutnya
+            if (i + 1 < lines.length) {
+                const next = lines[i + 1].trim();
+                const LABEL_PATTERN = /^(nik|tempat|tanggal|tgl|jenis|gol|agama|status|pekerjaan|kewarganegaraan|alamat|rt|rw|kel|kec|kota|kab|provinsi|berlaku)/i;
+                if (!LABEL_PATTERN.test(next) && /[a-zA-Z]{2,}/.test(next)) {
+                    result.nama = toTitleCase(next.replace(/[^a-zA-Z\s\.']/g, '').trim());
+                    break;
+                }
+            }
+        }
+    }
+    // Fallback: cari baris yang seluruhnya huruf kapital (panjang 4-40 char), bukan label umum KTP
     if (!result.nama) {
+        const SKIP = /^(NAMA|NIK|TEMPAT|TANGGAL|TGL|JENIS|GOLONGAN|AGAMA|STATUS|PEKERJAAN|KEWARGANEGARAAN|ALAMAT|RT|RW|KELURAHAN|KECAMATAN|KOTA|KABUPATEN|PROVINSI|REPUBLIK|INDONESIA|KARTU|TANDA|PENDUDUK|BERLAKU|HINGGA|DARAH)/;
         for (const line of lines) {
-            if (/^[A-Z\s]{5,40}$/.test(line) && !/^(NAMA|TEMPAT|TANGGAL|JENIS|AGAMA|GOLONGAN|STATUS|PEKERJAAN|ALAMAT|PROVINSI|KOTA|KABUPATEN|KECAMATAN|KELURAHAN|DESA|REPUBLIK|INDONESIA|KARTU|TANDA|PENDUDUK|NIK)/.test(line)) {
+            // Baris yang sebagian besar huruf kapital, tidak ada angka banyak
+            if (line.length >= 4 && line.length <= 45 &&
+                /^[A-Z][A-Z\s\.']{3,}$/.test(line) &&
+                !SKIP.test(line.trim())) {
                 result.nama = toTitleCase(line.trim());
                 break;
             }
         }
     }
 
-    // ── Tanggal Lahir ──
-    // Cari di baris yang mengandung label Tempat/Tanggal Lahir
-    for (const line of lines) {
-        if (/tempat.*lahir|tgl.*lahir|tanggal.*lahir/i.test(line) || /lahir/i.test(line)) {
-            const tglRaw = line.match(/(\d{1,2}[-\/\s]\d{1,2}[-\/\s]\d{4}|\d{1,2}\s+\w+\s+\d{4})/)?.[0];
+    // ════════════════════════════
+    //  TANGGAL LAHIR
+    // ════════════════════════════
+    // Cari baris yang mengandung pola tanggal di dekat label lahir
+    for (let i = 0; i < lines.length; i++) {
+        if (/lahir|ttl/i.test(lines[i])) {
+            // Coba parse dari baris yang sama
+            const tglRaw = lines[i].match(/(\d{1,2}[-\/\s]\d{1,2}[-\/\s]\d{4}|\d{1,2}\s+[a-zA-Z]+\s+\d{4})/)?.[0];
             if (tglRaw) { result.tgl_lahir = normalisasiTanggal(tglRaw); break; }
+            // Coba dari baris berikutnya
+            if (i + 1 < lines.length) {
+                const tglRaw2 = lines[i + 1].match(/(\d{1,2}[-\/\s]\d{1,2}[-\/\s]\d{4}|\d{1,2}\s+[a-zA-Z]+\s+\d{4})/)?.[0];
+                if (tglRaw2) { result.tgl_lahir = normalisasiTanggal(tglRaw2); break; }
+            }
         }
     }
-    // Fallback: cari pola tanggal di seluruh teks
+    // Fallback: cari pola tanggal di seluruh teks (hindari mengambil NIK)
     if (!result.tgl_lahir) {
-        const tglMatch = teks.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/);
-        if (tglMatch) result.tgl_lahir = normalisasiTanggal(tglMatch[1]);
+        const matches = [...teksNorm.matchAll(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/g)];
+        for (const m of matches) {
+            const dd = parseInt(m[1]), mm = parseInt(m[2]), yyyy = parseInt(m[3]);
+            if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yyyy >= 1900 && yyyy <= 2020) {
+                result.tgl_lahir = m[1].padStart(2,'0') + '/' + m[2].padStart(2,'0') + '/' + m[3];
+                break;
+            }
+        }
     }
 
-    // ── Jenis Kelamin ──
-    if (/LAKI-LAKI|LAKI LAKI|LELAKI/i.test(upper)) result.jk = 'L';
-    else if (/PEREMPUAN|WANITA/i.test(upper))       result.jk = 'P';
-    // Fallback dari NIK: digit ke-7 ≥ 40 → perempuan
+    // ════════════════════════════
+    //  JENIS KELAMIN
+    // ════════════════════════════
+    if (/LAKI.LAKI|LAKI LAKI|LELAKI/i.test(upper))  result.jk = 'L';
+    else if (/PEREMPUAN|WANITA/i.test(upper))        result.jk = 'P';
+    // Fallback dari NIK (digit ke-7 ≥ 4 → perempuan karena tanggal lahir +40)
     if (!result.jk && result.nik && result.nik.length === 16) {
         result.jk = parseInt(result.nik[6]) >= 4 ? 'P' : 'L';
     }
 
-    // ── Alamat ──
-    const alamatLineIdx = lines.findIndex(l => /^alamat\b/i.test(l));
-    if (alamatLineIdx !== -1) {
-        const bagianAlamat = [];
-        const alamatLine   = lines[alamatLineIdx].replace(/^alamat\s*[:\-]?\s*/i, '').trim();
-        if (alamatLine) bagianAlamat.push(alamatLine);
+    // ════════════════════════════
+    //  ALAMAT
+    // ════════════════════════════
+    for (let i = 0; i < lines.length; i++) {
+        if (/^alamat\b/i.test(lines[i])) {
+            const bagian = [];
+            const inline = lines[i].replace(/^alamat\s*[:\-]?\s*/i, '').trim();
+            if (inline.length > 1) bagian.push(inline);
 
-        // Ambil 2-3 baris berikutnya yang masih bagian alamat (bukan label baru)
-        for (let i = alamatLineIdx + 1; i < Math.min(alamatLineIdx + 4, lines.length); i++) {
-            const l = lines[i];
-            if (/^(rt|rw|kel|kec|kota|kab|provinsi|gol|agama|status|pekerjaan|kewarganegaraan|jenis|nama|nik|tempat|tanggal|berlaku)/i.test(l)) break;
-            bagianAlamat.push(l);
-        }
-
-        if (bagianAlamat.length > 0) {
-            result.alamat = bagianAlamat.join(', ').trim();
+            const STOP = /^(rt|rw|kel|kec|kota|kab|provinsi|gol|agama|status|pekerjaan|kewarganegaraan|jenis|nama|nik|tempat|tanggal|berlaku|tanda)/i;
+            for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                if (STOP.test(lines[j])) break;
+                bagian.push(lines[j]);
+            }
+            if (bagian.length > 0) {
+                result.alamat = bagian.join(' ').trim();
+                break;
+            }
         }
     }
 
+    console.log('[KTP Parser] Hasil parse:', result);
     return result;
 }
 
 // ── Fungsi utama: scan KTP dengan OCR.space ──
 async function scanKtpDenganOcrSpace(file) {
-    const resized = await resizeImageForAPI(file, 1400);
+    const resized = await resizeImageForAPI(file, 1600); // Sedikit lebih besar untuk akurasi
     const teksOcr = await ocrSpaceRequest(resized);
 
-    if (!teksOcr || teksOcr.trim().length < 10) {
-        throw new Error('Teks tidak terbaca dari gambar. Pastikan foto KTP jelas.');
+    if (!teksOcr || teksOcr.trim().length < 5) {
+        throw new Error('Teks tidak terbaca dari gambar. Pastikan foto KTP jelas & tidak buram.');
     }
 
     return parseKtpDariTeks(teksOcr);
