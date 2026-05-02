@@ -46,7 +46,8 @@ function renderKunjunganHariIni() {
     });
 
     container.innerHTML = sorted.map(h => {
-        const isDone = h.status === 'Selesai';
+        const isDone    = h.status === 'Selesai';
+        const diagRow   = window._isPerawat ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.62' : '1'};" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div class="visit-time-badge">${h.waktu || '-'}</div>
@@ -54,6 +55,7 @@ function renderKunjunganHariIni() {
                 <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.nama}</div>
                 <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">Keluhan: ${h.keluhan || '-'}</div>
                 <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C</div>
+                ${diagRow}
             </div>
             <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
         </div>`;
@@ -247,7 +249,7 @@ function renderRiwayatList(riwayatArr, containerId) {
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
                         <b>TTV:</b> TD ${r.td||'-'} | N ${r.nadi||'-'} | S ${r.suhu||'-'} | RR ${r.rr||'-'} | BB ${r.bb||'-'}
                     </div>
-                    <div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>
+                    ${window._isPerawat ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
                     <div class="riwayat-keluhan" style="color:var(--text); border-top:1px dashed var(--border); padding-top:4px; margin-bottom:3px;"><b>Keluhan:</b> ${r.keluhan || '-'}</div>
                     <div class="riwayat-keluhan" style="color:var(--text);"><b>Terapi:</b> ${r.terapi || '-'}</div>
                 </div>

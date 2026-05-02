@@ -168,16 +168,34 @@ function unlockScreen() {
 function applyRoleRestrictions() {
     if (!loggedInUser) return;
 
-    const bolehMedis = JABATAN_MEDIS.includes(loggedInUser.jabatan);
+    const jabatan     = loggedInUser.jabatan;
+    const bolehMedis  = JABATAN_MEDIS.includes(jabatan);
+    const isPerawat   = jabatan === 'Perawat';
 
+    // Tombol lanjut periksa
     const btnNext = $('btnNext');
     if (btnNext) btnNext.style.display = bolehMedis ? '' : 'none';
 
+    // Seksi klinis disembunyikan untuk Paramedis
     const sectionKlinis = $('sectionKlinis');
     if (sectionKlinis) {
-        sectionKlinis.style.display =
-            (loggedInUser.jabatan === 'Paramedis') ? 'none' : 'block';
+        sectionKlinis.style.display = (jabatan === 'Paramedis') ? 'none' : 'block';
     }
+
+    // ── PERAWAT: Sembunyikan diagnosa di form ──
+    const rowDiagnosa = document.querySelector('#diagnosa')?.closest('.row');
+    if (rowDiagnosa) rowDiagnosa.style.display = isPerawat ? 'none' : '';
+
+    // ── PERAWAT: Sembunyikan nav item halaman User ──
+    document.querySelectorAll('.nav-item').forEach(navEl => {
+        const onclick = navEl.getAttribute('onclick') || '';
+        if (onclick.includes('pageUser')) {
+            navEl.style.display = isPerawat ? 'none' : '';
+        }
+    });
+
+    // Simpan flag ke window supaya bisa diakses modul lain (render riwayat, dll.)
+    window._isPerawat = isPerawat;
 
     if (!bolehMedis && localStorage.getItem('activePage') === 'pageMedis') {
         localStorage.removeItem('activePage');

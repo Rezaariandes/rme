@@ -44,6 +44,22 @@ function openModal(index) {
     if ($('modalTerapi')) $('modalTerapi').value = r.terapi || '';
 
     toggleEditModal(false);
+
+    // Sembunyikan baris diagnosa untuk Perawat
+    const isPerawat = window._isPerawat === true;
+    ['viewDiag', 'modalDiag1', 'modalDiag2'].forEach(id => {
+        const el = $(id);
+        if (el) el.closest('.col-6, .form-group, div') && (el.parentElement.style.display = isPerawat ? 'none' : '');
+    });
+    // Sembunyikan label & wrapper row diagnosa di mode view
+    const viewDiagEl = $('viewDiag');
+    if (viewDiagEl) {
+        const wrapper = viewDiagEl.closest('[class]') || viewDiagEl.parentElement;
+        if (wrapper) wrapper.style.display = isPerawat ? 'none' : '';
+    }
+    // Sembunyikan row diagnosa di mode edit
+    const diagRow = $('modalDiag1') ? $('modalDiag1').closest('.row') : null;
+    if (diagRow) diagRow.style.display = isPerawat ? 'none' : '';
     const modal = $('modalRiwayat');
     if (modal) modal.classList.add('show');
 }
