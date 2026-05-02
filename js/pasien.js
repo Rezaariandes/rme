@@ -202,33 +202,281 @@ function resetSession() {
     fetchByDate();
 }
 
-// ── SCAN KTP (OCR via Tesseract) ──
+// ════════════════════════════════════════════════════════
+//  SCAN KTP — PERBAIKAN LENGKAP
+//  Masalah sebelumnya:
+//  1. Regex NIK \b\d{16}\b gagal jika ada spasi antar digit
+//  2. Parser nama tidak menangani variasi format KTP daerah
+//  3. Tidak ada preprocessing gambar (kontras, grayscale)
+//  4. Tidak ada fallback strategi pencarian
+// ════════════════════════════════════════════════════════
+
+// ── PREPROCESSING: Tingkatkan kontras & sharpness gambar ──
+function preprocessKtpImage(file) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            // Perbesar gambar 2x agar OCR lebih akurat
+            const scale  = Math.min(2, 2000 / Math.max(img.width, img.height));
+            canvas.width  = img.width  * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+
+            // Gambar asli
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // Ambil pixel data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data      = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Konversi ke grayscale (luminance weighted)
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+                // Tingkatkan kontras (faktor 1.8)
+                const contrast = 1.8;
+                const factor   = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+                const val      = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
+
+                data[i]     = val; // R
+                data[i + 1] = val; // G
+                data[i + 2] = val; // B
+                // Alpha tidak diubah
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(resolve, 'image/png');
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+        img.src = url;
+    });
+}
+
+// ── EKSTRAK NIK: Cari 16 digit berurutan (toleran spasi & OCR noise) ──
+function extractNIK(text) {
+    // Strategi 1: 16 digit mepet (paling ideal)
+    let m = text.match(/\b(\d{16})\b/);
+    if (m) return m[1];
+
+    // Strategi 2: Baris yang mengandung kata NIK / nomor, ambil semua digit
+    const lines = text.split('\n');
+    for (const line of lines) {
+        const upper = line.toUpperCase();
+        if (upper.includes('NIK') || upper.includes('NO.') || upper.includes('NOMOR')) {
+            const digits = line.replace(/\D/g, '');
+            if (digits.length === 16) return digits;
+            // Toleransi: 15–17 digit (OCR kadang salah baca 1 digit)
+            if (digits.length >= 15 && digits.length <= 17) return digits.substring(0, 16);
+        }
+    }
+
+    // Strategi 3: Cari sekuens digit 16 karakter di seluruh teks (termasuk ada spasi)
+    const allDigits = text.replace(/[^\d\s]/g, '');
+    const sequences = allDigits.match(/\d[\d\s]{14,18}\d/g) || [];
+    for (const seq of sequences) {
+        const digits = seq.replace(/\s/g, '');
+        if (digits.length === 16) return digits;
+    }
+
+    return null;
+}
+
+// ── EKSTRAK NAMA: Multi-strategi parsing KTP Indonesia ──
+function extractNama(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    // ── Keyword label yang ada di KTP ──
+    const labelNama  = /^(NAMA\s*[:.]?|Nama\s*[:.]?)/i;
+    const skipWords  = /^(NIK|PROVINSI|KABUPATEN|KOTA|KECAMATAN|KELURAHAN|DESA|DUSUN|RT|RW|ALAMAT|TEMPAT|TGL|JENIS|GOL|STATUS|PEKERJAAN|KEWARGANEGARAAN|BERLAKU|AGAMA|DARAH|LAHIR|SCAN|KTP|INDONESIA)/i;
+    const validNama  = /^[A-Z][A-Za-z .'\-]{2,50}$/;  // nama valid: huruf, spasi, titik, strip
+
+    // Strategi 1: Baris yang DIAWALI kata "NAMA"
+    for (let i = 0; i < lines.length; i++) {
+        if (labelNama.test(lines[i])) {
+            // Nama bisa di baris yang sama setelah label
+            let nama = lines[i].replace(labelNama, '').replace(/^[\s:.]+/, '').trim();
+            // Bersihkan karakter aneh di awal/akhir
+            nama = nama.replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z\s.']+$/, '').trim();
+            if (nama.length >= 3 && validNama.test(nama)) return toTitleCase(nama);
+
+            // Nama ada di baris berikutnya
+            if (i + 1 < lines.length) {
+                let namaNext = lines[i + 1].replace(/^[\s:.]+/, '').trim();
+                namaNext = namaNext.replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z\s.']+$/, '').trim();
+                if (namaNext.length >= 3 && !skipWords.test(namaNext)) return toTitleCase(namaNext);
+            }
+        }
+    }
+
+    // Strategi 2: Cari baris ALL CAPS tanpa digit yang bukan keyword KTP
+    //             (nama di KTP biasanya kapital semua)
+    const capsLines = lines.filter(l => {
+        const onlyCaps = /^[A-Z][A-Z\s.']{2,50}$/.test(l);
+        const notKw    = !skipWords.test(l);
+        const noDigit  = !/\d/.test(l);
+        return onlyCaps && notKw && noDigit;
+    });
+
+    // Pilih baris ALL CAPS paling panjang (kemungkinan nama)
+    if (capsLines.length > 0) {
+        const best = capsLines.reduce((a, b) => a.length >= b.length ? a : b);
+        return toTitleCase(best.trim());
+    }
+
+    // Strategi 3: Fallback — baris setelah NIK yang terlihat seperti nama
+    for (let i = 0; i < lines.length; i++) {
+        if (/\d{16}/.test(lines[i].replace(/\s/g, ''))) {
+            // Cek 1–3 baris setelah NIK
+            for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
+                let candidate = lines[j].replace(/^[^A-Za-z]+/, '').trim();
+                if (candidate.length >= 3 && !skipWords.test(candidate) && !/\d{4}/.test(candidate)) {
+                    return toTitleCase(candidate);
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+// ── TITLE CASE helper ──
+function toTitleCase(str) {
+    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── EKSTRAK TANGGAL LAHIR dari teks OCR ──
+function extractTglLahir(text) {
+    // Format: DD-MM-YYYY atau DD/MM/YYYY atau DD MM YYYY
+    const patterns = [
+        /(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/,  // DD-MM-YYYY
+        /LAHIR\s*[:.]?\s*(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/i,
+        /TGL\.?\s*LAHIR\s*[:.]?\s*(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/i,
+    ];
+    for (const pat of patterns) {
+        const m = text.match(pat);
+        if (m) {
+            // Validasi: bulan 01-12, hari 01-31
+            const d = parseInt(m[m.length - 3]);
+            const mo = parseInt(m[m.length - 2]);
+            const y  = parseInt(m[m.length - 1]);
+            if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 1900 && y <= new Date().getFullYear()) {
+                return String(d).padStart(2,'0') + '/' + String(mo).padStart(2,'0') + '/' + y;
+            }
+        }
+    }
+    return null;
+}
+
+// ── EKSTRAK JENIS KELAMIN ──
+function extractJK(text) {
+    const upper = text.toUpperCase();
+    if (upper.includes('PEREMPUAN') || upper.includes('P ') || upper.includes(' P\n')) return 'P';
+    if (upper.includes('LAKI-LAKI') || upper.includes('LAKI LAKI')) return 'L';
+    return null;
+}
+
+// ── EKSTRAK ALAMAT ──
+function extractAlamat(text) {
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const upper = lines[i].toUpperCase();
+        if (upper.includes('ALAMAT')) {
+            let alamat = lines[i].replace(/ALAMAT\s*[:.]?/i, '').trim();
+            // Ambil 1-2 baris berikutnya jika masih bagian alamat
+            if (i + 1 < lines.length && !/^(RT|RW|KEL|KEC|KAB|KOTA|PROV|AGAMA|GOL|STATUS|PEKERJAAN)/i.test(lines[i+1])) {
+                alamat += ' ' + lines[i+1].trim();
+            }
+            alamat = alamat.replace(/^[^A-Za-z0-9]+/, '').trim();
+            if (alamat.length >= 3) return alamat;
+        }
+    }
+    return null;
+}
+
+// ── INISIALISASI SCAN KTP (UTAMA) ──
 function initScanKtp() {
     const camInput = $('camInput');
     if (!camInput) return;
+
     camInput.addEventListener('change', async function (e) {
         const file = e.target.files[0];
         if (!file) return;
-        showToast("⏳ Sedang membaca KTP...", "info");
+
+        showToast("⏳ Memproses gambar KTP...", "info");
+
         try {
-            const result   = await Tesseract.recognize(file, 'ind');
-            const text     = result.data.text;
-            const nikMatch = text.match(/\b\d{16}\b/);
-            if (nikMatch && $('nik')) $('nik').value = nikMatch[0];
-            const lines = text.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].toUpperCase().includes('NAMA')) {
-                    let nama = lines[i].replace(/NAMA|:|Nama/gi, '').trim();
-                    if (!nama && i + 1 < lines.length) nama = lines[i + 1].replace(/:/g, '').trim();
-                    if (nama && $('nama')) $('nama').value = nama;
-                    break;
-                }
+            // 1. Preprocessing: tingkatkan kualitas gambar
+            const processedBlob = await preprocessKtpImage(file);
+
+            showToast("🔍 Membaca teks KTP...", "info");
+
+            // 2. OCR dengan konfigurasi optimal untuk KTP
+            const result = await Tesseract.recognize(processedBlob, 'ind', {
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-/.() ',
+                preserve_interword_spaces: '1',
+            });
+
+            const text = result.data.text;
+            console.log('[KTP OCR Raw]', text); // Untuk debugging
+
+            let foundNIK  = false;
+            let foundNama = false;
+            let summary   = [];
+
+            // 3. Ekstrak NIK
+            const nik = extractNIK(text);
+            if (nik && $('nik')) {
+                $('nik').value = nik;
+                foundNIK = true;
+                summary.push('NIK ✓');
             }
-            showToast("✅ KTP berhasil dipindai", "success");
+
+            // 4. Ekstrak Nama
+            const nama = extractNama(text);
+            if (nama && $('nama')) {
+                $('nama').value = nama;
+                foundNama = true;
+                summary.push('Nama ✓');
+            }
+
+            // 5. Ekstrak Tanggal Lahir (bonus)
+            const tgl = extractTglLahir(text);
+            if (tgl && $('tgl_lahir') && !$('tgl_lahir').value) {
+                $('tgl_lahir').value = tgl;
+                summary.push('Tgl Lahir ✓');
+            }
+
+            // 6. Ekstrak Jenis Kelamin (bonus)
+            const jk = extractJK(text);
+            if (jk && $('jk')) {
+                $('jk').value = jk;
+                summary.push('JK ✓');
+            }
+
+            // 7. Ekstrak Alamat (bonus)
+            const alamat = extractAlamat(text);
+            if (alamat && $('alamat') && !$('alamat').value) {
+                $('alamat').value = alamat;
+                summary.push('Alamat ✓');
+            }
+
+            // 8. Tampilkan hasil
+            if (foundNIK || foundNama) {
+                showToast("✅ KTP terbaca: " + summary.join(', '), "success");
+            } else {
+                showToast("⚠️ KTP kurang jelas. Coba foto lebih dekat & terang.", "warning");
+                console.warn('[KTP OCR] Tidak bisa ekstrak data. Raw text:', text);
+            }
+
         } catch (err) {
-            showToast("❌ Gagal membaca KTP", "error");
+            console.error('[KTP OCR Error]', err);
+            showToast("❌ Gagal membaca KTP. Pastikan gambar jelas & pencahayaan cukup.", "error");
         }
-        // Reset input agar bisa scan ulang file yang sama
+
+        // Reset agar bisa scan ulang file yang sama
         camInput.value = '';
     });
 }
