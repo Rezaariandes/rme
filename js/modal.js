@@ -6,102 +6,114 @@
 // ── BUKA MODAL RIWAYAT ──
 function openModal(index) {
     const r = currentRiwayat[index];
-    $('modalIndex').value = index;
+    if (!r) return;
+    if ($('modalIndex')) $('modalIndex').value = index;
 
-    // View mode
-    $('modalTanggalInfoView').innerText =
-        "📅 Tanggal Kunjungan: " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
-    $('viewKeluhan').innerText  = r.keluhan || '-';
-    $('viewFisik').innerText    = r.fisik   || '-';
-    $('viewTtv').innerHTML      = `TD: ${r.td||'-'} | N: ${r.nadi||'-'} | S: ${r.suhu||'-'} <br> RR: ${r.rr||'-'} | BB: ${r.bb||'-'} | TB: ${r.tb||'-'}`;
-    $('viewDiag').innerText     = r.diag    || '-';
-    $('viewTerapi').innerText   = r.terapi  || '-';
+    // Mode View
+    if ($('modalTanggalInfoView'))
+        $('modalTanggalInfoView').innerText =
+            "📅 " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
+    if ($('viewKeluhan')) $('viewKeluhan').innerText = r.keluhan || '-';
+    if ($('viewFisik'))   $('viewFisik').innerText   = r.fisik   || '-';
+    if ($('viewTtv'))     $('viewTtv').innerHTML     =
+        `TD: ${r.td||'-'} | N: ${r.nadi||'-'} | S: ${r.suhu||'-'} <br> RR: ${r.rr||'-'} | BB: ${r.bb||'-'} | TB: ${r.tb||'-'}`;
+    if ($('viewDiag'))    $('viewDiag').innerText    = r.diag   || '-';
+    if ($('viewTerapi'))  $('viewTerapi').innerText  = r.terapi || '-';
 
-    // Edit mode
-    $('modalTanggalInfoEdit').innerText =
-        "✏️ Edit Tanggal: " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
-    $('modalKeluhan').value = r.keluhan || '';
-    $('modalFisik').value   = r.fisik   || '';
-    $('modalTd').value      = r.td      || '';
-    $('modalNadi').value    = r.nadi    || '';
-    $('modalSuhu').value    = r.suhu    || '';
-    $('modalRr').value      = r.rr      || '';
-    $('modalBb').value      = r.bb      || '';
-    $('modalTb').value      = r.tb      || '';
+    // Mode Edit
+    if ($('modalTanggalInfoEdit'))
+        $('modalTanggalInfoEdit').innerText =
+            "✏️ Edit: " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
+    if ($('modalKeluhan')) $('modalKeluhan').value = r.keluhan || '';
+    if ($('modalFisik'))   $('modalFisik').value   = r.fisik   || '';
+    if ($('modalTd'))      $('modalTd').value      = r.td      || '';
+    if ($('modalNadi'))    $('modalNadi').value    = r.nadi    || '';
+    if ($('modalSuhu'))    $('modalSuhu').value    = r.suhu    || '';
+    if ($('modalRr'))      $('modalRr').value      = r.rr      || '';
+    if ($('modalBb'))      $('modalBb').value      = r.bb      || '';
+    if ($('modalTb'))      $('modalTb').value      = r.tb      || '';
 
-    let diagLama = String(r.diag || '');
+    const diagLama = String(r.diag || '');
     if (diagLama.includes(" | ")) {
-        $('modalDiag1').value = diagLama.split(" | ")[0];
-        $('modalDiag2').value = diagLama.split(" | ")[1];
+        if ($('modalDiag1')) $('modalDiag1').value = diagLama.split(" | ")[0];
+        if ($('modalDiag2')) $('modalDiag2').value = diagLama.split(" | ")[1];
     } else {
-        $('modalDiag1').value = diagLama;
-        $('modalDiag2').value = "";
+        if ($('modalDiag1')) $('modalDiag1').value = diagLama;
+        if ($('modalDiag2')) $('modalDiag2').value = '';
     }
-    $('modalTerapi').value = r.terapi || '';
+    if ($('modalTerapi')) $('modalTerapi').value = r.terapi || '';
 
     toggleEditModal(false);
-    $('modalRiwayat').classList.add('show');
+    const modal = $('modalRiwayat');
+    if (modal) modal.classList.add('show');
 }
 
-// ── TOGGLE ANTARA VIEW & EDIT MODE ──
+// ── TOGGLE VIEW / EDIT ──
 function toggleEditModal(isEdit) {
-    $('modalTitle').innerText       = isEdit ? "✏️ Edit Rekam Medis" : "📋 Detail Rekam Medis";
-    $('modalView').style.display    = isEdit ? 'none'  : 'block';
-    $('modalEdit').style.display    = isEdit ? 'block' : 'none';
+    if ($('modalTitle'))
+        $('modalTitle').innerText = isEdit ? "✏️ Edit Rekam Medis" : "📋 Detail Rekam Medis";
+    if ($('modalView')) $('modalView').style.display = isEdit ? 'none'  : 'block';
+    if ($('modalEdit')) $('modalEdit').style.display = isEdit ? 'block' : 'none';
 }
 
 function closeModal() {
-    $('modalRiwayat').classList.remove('show');
+    const modal = $('modalRiwayat');
+    if (modal) modal.classList.remove('show');
 }
 
-// ── SIMPAN HASIL EDIT DARI MODAL ──
+// ── SIMPAN EDIT DARI MODAL ──
 async function simpanEditModal() {
     const btn = $('btnSaveModal');
-    btn.disabled = true;
-    btn.innerText = "Menyimpan...";
+    if (btn) { btn.disabled = true; btn.innerText = "Menyimpan..."; }
 
-    const idx = $('modalIndex').value;
+    const idx = $('modalIndex') ? $('modalIndex').value : 0;
     const r   = currentRiwayat[idx];
-    const d1  = $('modalDiag1').value;
-    const d2  = $('modalDiag2').value;
-    let diagGabung = d1;
-    if (d2) diagGabung += " | " + d2;
+    if (!r) {
+        if (btn) { btn.disabled = false; btn.innerText = "💾 Simpan Perubahan"; }
+        return showToast("❌ Data tidak ditemukan", "error");
+    }
+
+    const d1 = $('modalDiag1') ? $('modalDiag1').value : '';
+    const d2 = $('modalDiag2') ? $('modalDiag2').value : '';
+    const diagGabung = d2 ? (d1 + " | " + d2) : d1;
 
     const payload = {
-        action: "saveKunjungan",
-        pasienId: currentPasienId,
+        action:      "saveKunjungan",
+        pasienId:    currentPasienId,
         kunjunganId: r.id,
-        keluhan: $('modalKeluhan').value,
-        fisik:   $('modalFisik').value,
-        td:      $('modalTd').value,
-        nadi:    $('modalNadi').value,
-        suhu:    $('modalSuhu').value,
-        rr:      $('modalRr').value,
-        bb:      $('modalBb').value,
-        tb:      $('modalTb').value,
+        keluhan:  $('modalKeluhan') ? $('modalKeluhan').value : '',
+        fisik:    $('modalFisik')   ? $('modalFisik').value   : '',
+        td:       $('modalTd')      ? $('modalTd').value      : '',
+        nadi:     $('modalNadi')    ? $('modalNadi').value    : '',
+        suhu:     $('modalSuhu')    ? $('modalSuhu').value    : '',
+        rr:       $('modalRr')      ? $('modalRr').value      : '',
+        bb:       $('modalBb')      ? $('modalBb').value      : '',
+        tb:       $('modalTb')      ? $('modalTb').value      : '',
         diagnosa: diagGabung,
-        terapi:   $('modalTerapi').value
+        terapi:   $('modalTerapi')  ? $('modalTerapi').value  : ''
     };
 
     try {
         await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
-        showToast("✅ Perubahan disimpan", "success");
+        showToast("✅ Perubahan berhasil disimpan", "success");
 
-        // Update data lokal
-        r.keluhan = payload.keluhan; r.fisik  = payload.fisik;
-        r.td      = payload.td;      r.nadi   = payload.nadi;
-        r.suhu    = payload.suhu;    r.rr     = payload.rr;
-        r.bb      = payload.bb;      r.tb     = payload.tb;
-        r.diag    = payload.diagnosa; r.terapi = payload.terapi;
+        // Update data lokal tanpa fetch ulang
+        Object.assign(r, {
+            keluhan: payload.keluhan, fisik:   payload.fisik,
+            td:      payload.td,      nadi:    payload.nadi,
+            suhu:    payload.suhu,    rr:      payload.rr,
+            bb:      payload.bb,      tb:      payload.tb,
+            diag:    payload.diagnosa, terapi: payload.terapi
+        });
 
         renderRiwayatList(currentRiwayat, 'historyListMedis');
-        if ($('riwayatDaftarContainer')) renderRiwayatList(currentRiwayat, 'riwayatDaftarContainer');
+        if ($('riwayatDaftarContainer'))
+            renderRiwayatList(currentRiwayat, 'riwayatDaftarContainer');
         localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
         closeModal();
     } catch (e) {
-        showToast("❌ Gagal menyimpan", "error");
+        showToast("❌ Gagal menyimpan perubahan", "error");
     } finally {
-        btn.disabled  = false;
-        btn.innerText = "💾 Simpan Perubahan";
+        if (btn) { btn.disabled = false; btn.innerText = "💾 Simpan Perubahan"; }
     }
 }

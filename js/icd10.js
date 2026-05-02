@@ -49,7 +49,7 @@ const icd10Data = [
     "R51 - Nyeri Kepala (Headache)"
 ];
 
-/** Mengisi datalist ICD-10 ke elemen HTML yang diberikan */
+/** Mengisi datalist ICD-10 ke elemen dengan id tertentu */
 function populateIcd10(datalistId) {
     const listEl = document.getElementById(datalistId);
     if (!listEl) return;

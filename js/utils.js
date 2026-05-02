@@ -35,13 +35,14 @@ function hitungUmur(tglStr) {
 // ── TOAST NOTIFICATION ──
 function showToast(msg, type) {
     const c = $('toastContainer');
+    if (!c) return;
     const t = document.createElement('div');
     t.className = `toast ${type}`;
     t.innerText = msg;
     c.appendChild(t);
     setTimeout(() => {
         t.style.opacity = '0';
-        setTimeout(() => t.remove(), 300);
+        setTimeout(() => t.remove(), 320);
     }, 3000);
 }
 
@@ -76,6 +77,7 @@ function buildColorSwitcher() {
     return sw;
 }
 
+// Auto-rotate tema setiap 8 detik
 setInterval(() => {
     currentTheme = (currentTheme + 1) % themes.length;
     applyTheme(currentTheme);
@@ -99,14 +101,14 @@ function checkTensi() {
     const s = parseInt($('sistol').value);
     const d = parseInt($('diastol').value);
     if (s >= 140) $('sistol').classList.add('is-high'); else $('sistol').classList.remove('is-high');
-    if (d >= 90) $('diastol').classList.add('is-high'); else $('diastol').classList.remove('is-high');
+    if (d >= 90)  $('diastol').classList.add('is-high'); else $('diastol').classList.remove('is-high');
 }
 
 // ── AUTO-SAVE & CLEAR SESSION ──
 function loadAutosave() {
     document.querySelectorAll('[data-save="true"]').forEach(el => {
         const v = localStorage.getItem('rme_' + el.id);
-        if (v) {
+        if (v !== null) {
             el.value = v;
             if (el.id === 'bb' || el.id === 'tb') calculateIMT();
             if (el.id === 'sistol' || el.id === 'diastol') checkTensi();
@@ -117,45 +119,53 @@ function loadAutosave() {
 function clearSession() {
     document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.removeItem('rme_' + el.id));
     localStorage.removeItem('activePage');
-    $('suratSakit').checked = false;
-    $('imtCalc').innerText = "";
-    $('sistol').classList.remove('is-high');
-    $('diastol').classList.remove('is-high');
+    const ss = $('suratSakit');
+    if (ss) ss.checked = false;
+    const imt = $('imtCalc');
+    if (imt) imt.innerText = "";
+    const sistol  = $('sistol');
+    const diastol = $('diastol');
+    if (sistol)  sistol.classList.remove('is-high');
+    if (diastol) diastol.classList.remove('is-high');
 }
 
-// ── INPUT OTOMATIS FORMAT TANGGAL LAHIR ──
+// ── INPUT FORMAT TANGGAL LAHIR OTOMATIS ──
 function bindTglLahirFormat(inputId) {
     const el = $(inputId);
     if (!el) return;
     el.addEventListener('input', function () {
         let v = this.value.replace(/\D/g, '');
         if (v.length > 8) v = v.substring(0, 8);
-        if (v.length >= 5) {
-            this.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4, 8);
-        } else if (v.length >= 3) {
-            this.value = v.substring(0, 2) + '/' + v.substring(2, 4);
-        } else {
-            this.value = v;
-        }
+        if (v.length >= 5)      this.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4, 8);
+        else if (v.length >= 3) this.value = v.substring(0, 2) + '/' + v.substring(2, 4);
+        else                    this.value = v;
     });
 }
 
 // ── SPEECH TO TEXT ──
 function startSTT(targetId) {
-    if (!('webkitSpeechRecognition' in window)) return showToast("❌ Mikrofon tidak didukung", "error");
+    if (!('webkitSpeechRecognition' in window)) {
+        return showToast("❌ Mikrofon tidak didukung di browser ini", "error");
+    }
     const btn = event.currentTarget;
     const rec = new webkitSpeechRecognition();
     rec.lang = 'id-ID';
+    rec.continuous = false;
+    rec.interimResults = false;
     btn.classList.add('recording');
     showToast("🎙️ Mendengarkan...", "info");
     rec.start();
     rec.onresult = (e) => {
         const el = $(targetId);
+        if (!el) return;
         el.value += (el.value ? ' ' : '') + e.results[0][0].transcript;
         localStorage.setItem('rme_' + targetId, el.value);
-        showToast("✅ Teks ditambahkan", "success");
+        showToast("✅ Teks berhasil ditambahkan", "success");
         btn.classList.remove('recording');
     };
-    rec.onerror = () => btn.classList.remove('recording');
+    rec.onerror = (e) => {
+        showToast("❌ Gagal mendengarkan: " + e.error, "error");
+        btn.classList.remove('recording');
+    };
     rec.onend = () => btn.classList.remove('recording');
 }

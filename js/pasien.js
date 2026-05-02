@@ -9,20 +9,24 @@ let currentRiwayat  = [];
 
 // ── AUTO-FILL DATA PASIEN DARI LIST ──
 async function autoFillPasien() {
-    const p = allPatients.find(x => x.nama === $('nama').value);
+    const namaVal = $('nama') ? $('nama').value : '';
+    const p = allPatients.find(x => x.nama === namaVal);
     if (!p) return;
 
-    $('nik').value      = p.nik || '';
-    $('jk').value       = p.jk || 'L';
-    $('alamat').value   = p.alamat || '';
-    $('tgl_lahir').value = formatTglIndo(p.tgl) || '';
-    currentPasienId     = p.id;
+    if ($('nik'))       $('nik').value       = p.nik    || '';
+    if ($('jk'))        $('jk').value        = p.jk     || 'L';
+    if ($('alamat'))    $('alamat').value    = p.alamat || '';
+    if ($('tgl_lahir')) $('tgl_lahir').value = formatTglIndo(p.tgl) || '';
+    currentPasienId = p.id;
 
-    $('riwayatDaftarContainer').innerHTML =
-        `<div style="text-align:center;color:var(--primary);padding:10px;font-size:13px;">⏳ Mencari riwayat...</div>`;
+    const riwayatEl = $('riwayatDaftarContainer');
+    if (riwayatEl) {
+        riwayatEl.innerHTML =
+            `<div style="text-align:center;color:var(--primary);padding:10px;font-size:13px;">⏳ Mencari riwayat...</div>`;
+    }
 
     try {
-        const res = await fetch(APP_URL, {
+        const res  = await fetch(APP_URL, {
             method: 'POST',
             body: JSON.stringify({ action: "checkAndUpsertPasien", nama: p.nama, nik: p.nik })
         });
@@ -31,29 +35,30 @@ async function autoFillPasien() {
         currentRiwayat  = data.riwayat || [];
         renderRiwayatList(currentRiwayat, 'riwayatDaftarContainer');
     } catch (e) {
-        $('riwayatDaftarContainer').innerHTML = '';
+        if (riwayatEl) riwayatEl.innerHTML = '';
     }
 }
 
-// ── SIMPAN DATA PASIEN SAJA (TANPA KUNJUNGAN) ──
+// ── SIMPAN DATA PASIEN (TANPA KUNJUNGAN) ──
 async function simpanDataPasienOnly() {
-    const nama      = $('nama').value.trim();
-    const tgl_lahir = $('tgl_lahir').value.trim();
-    const alamat    = $('alamat').value.trim();
+    const nama      = $('nama')      ? $('nama').value.trim()      : '';
+    const tgl_lahir = $('tgl_lahir') ? $('tgl_lahir').value.trim() : '';
+    const alamat    = $('alamat')    ? $('alamat').value.trim()    : '';
 
     if (!nama) return showToast("⚠️ Nama wajib diisi!", "warning");
     if (!tgl_lahir && !alamat) return showToast("⚠️ Isi minimal Tgl Lahir atau Alamat!", "warning");
 
     const btn = $('btnSimpanPasien');
-    btn.disabled = true;
-    btn.innerHTML = 'Menyimpan...';
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Menyimpan...'; }
 
     try {
         const payload = {
             action: "savePasienOnly",
             pasienId: currentPasienId,
-            nik: $('nik').value, nama, tgl_lahir,
-            jk: $('jk').value, alamat
+            nik: $('nik') ? $('nik').value : '',
+            nama, tgl_lahir,
+            jk:     $('jk')     ? $('jk').value     : 'L',
+            alamat
         };
         const res    = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
         const result = await res.json();
@@ -62,22 +67,19 @@ async function simpanDataPasienOnly() {
     } catch (e) {
         showToast("❌ Gagal menyimpan", "error");
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '💾 Simpan Data';
+        if (btn) { btn.disabled = false; btn.innerHTML = '💾 Simpan Data'; }
     }
 }
 
-// ── LANJUT KE HALAMAN PEMERIKSAAN MEDIS ──
+// ── LANJUT KE PEMERIKSAAN MEDIS ──
 async function lanjutPemeriksaan() {
-    // Cek hak akses jabatan terlebih dahulu
     if (!canAccessMedis()) return;
 
-    const namaPasien = $('nama').value.trim();
+    const namaPasien = $('nama') ? $('nama').value.trim() : '';
     if (!namaPasien) return showToast("⚠️ Nama wajib diisi!", "error");
 
     const btn = $('btnNext');
-    btn.disabled = true;
-    btn.innerHTML = 'Memproses...';
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Memproses...'; }
 
     const today        = new Date();
     const tzOffset     = today.getTimezoneOffset() * 60000;
@@ -86,43 +88,41 @@ async function lanjutPemeriksaan() {
     const parts        = localDateStr.split('-');
     const tglIndoFull  = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
-    const umur = hitungUmur($('tgl_lahir').value);
-    $('infoPasienNama').innerText     = namaPasien;
-    $('infoPasienNik').innerText      = "NIK: " + ($('nik').value || '-');
-    $('infoPasienUmur').innerText     = "Umur: " + umur;
-    $('infoTglPemeriksaan').innerText = "Tgl: " + tglIndoFull;
-    $('infoTglPemeriksaan').style.display = 'block';
+    const umur = hitungUmur($('tgl_lahir') ? $('tgl_lahir').value : '');
 
-    if (!currentPasienId || $('nama').value.trim() !== ($('infoPasienNama').innerText)) {
-        document.querySelectorAll('[data-save="true"]').forEach(el => {
-            el.value = '';
-            localStorage.removeItem('rme_' + el.id);
-        });
-        $('imtCalc').innerText = "";
-        $('sistol').classList.remove('is-high');
-        $('diastol').classList.remove('is-high');
+    if ($('infoPasienNama'))     $('infoPasienNama').innerText     = namaPasien;
+    if ($('infoPasienNik'))      $('infoPasienNik').innerText      = "NIK: " + ($('nik') ? $('nik').value : '-');
+    if ($('infoPasienUmur'))     $('infoPasienUmur').innerText     = "Umur: " + umur;
+    if ($('infoTglPemeriksaan')) {
+        $('infoTglPemeriksaan').innerText     = "Tgl: " + tglIndoFull;
+        $('infoTglPemeriksaan').style.display = 'block';
     }
 
-    $('historyListMedis').innerHTML =
-        `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat riwayat...</div>`;
     const tanggalRekamLabel = "Tgl: " + tglIndoFull;
     localStorage.setItem('activePage', 'pageMedis');
-    localStorage.setItem('cP_nama', namaPasien);
-    localStorage.setItem('cP_nik', "NIK: " + ($('nik').value || '-'));
-    localStorage.setItem('cP_umur', "Umur: " + umur);
-    localStorage.setItem('cTglEdit', tanggalRekamLabel);
+    localStorage.setItem('cP_nama',   namaPasien);
+    localStorage.setItem('cP_nik',    "NIK: " + ($('nik') ? $('nik').value : '-'));
+    localStorage.setItem('cP_umur',   "Umur: " + umur);
+    localStorage.setItem('cTglEdit',  tanggalRekamLabel);
+
+    if ($('historyListMedis')) {
+        $('historyListMedis').innerHTML =
+            `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat riwayat...</div>`;
+    }
 
     switchPage('pageMedis', null);
-    btn.disabled = false;
-    btn.innerHTML = 'Lanjut Periksa ›';
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Lanjut Periksa ›'; }
 
     try {
         const payload = {
             action: "checkAndUpsertPasien",
             createVisitToday: true,
             localDate: localDateStr, localTime: localTimeStr,
-            nama: namaPasien, nik: $('nik').value,
-            tgl_lahir: $('tgl_lahir').value, jk: $('jk').value, alamat: $('alamat').value
+            nama: namaPasien,
+            nik:      $('nik')      ? $('nik').value      : '',
+            tgl_lahir: $('tgl_lahir') ? $('tgl_lahir').value : '',
+            jk:       $('jk')       ? $('jk').value       : 'L',
+            alamat:   $('alamat')   ? $('alamat').value   : ''
         };
         const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -133,32 +133,14 @@ async function lanjutPemeriksaan() {
         currentRiwayat  = data.riwayat || [];
 
         const tglIndoNorm = `${parseInt(parts[2])}/${parseInt(parts[1])}/${parts[0]}`;
-        let visitHariIni = currentRiwayat.find(r => {
+        const visitHariIni = currentRiwayat.find(r => {
             const t = String(r.tgl || '').trim();
             return t === tglIndoFull || t === tglIndoNorm || t === localDateStr;
         });
 
         if (visitHariIni) {
             currentKunjunganId = visitHariIni.id;
-            let tdLama = String(visitHariIni.td || '');
-            $('sistol').value   = tdLama.includes('/') ? tdLama.split('/')[0] : tdLama;
-            $('diastol').value  = tdLama.includes('/') ? tdLama.split('/')[1] : '';
-            $('nadi').value     = visitHariIni.nadi  || '';
-            $('suhu').value     = visitHariIni.suhu  || '';
-            $('rr').value       = visitHariIni.rr    || '';
-            $('bb').value       = visitHariIni.bb    || '';
-            $('tb').value       = visitHariIni.tb    || '';
-            $('keluhan').value  = visitHariIni.keluhan || '';
-            $('fisik').value    = visitHariIni.fisik   || '';
-            let diagLama = String(visitHariIni.diag || '');
-            if (diagLama.includes(" | ")) {
-                $('diagnosa').value  = diagLama.split(" | ")[0];
-                $('diagnosa2').value = diagLama.split(" | ")[1];
-            } else {
-                $('diagnosa').value  = diagLama;
-                $('diagnosa2').value = "";
-            }
-            $('terapi').value = visitHariIni.terapi || '';
+            _isiFormDariKunjungan(visitHariIni);
             document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.setItem('rme_' + el.id, el.value));
             calculateIMT(); checkTensi();
             showToast("ℹ️ Melanjutkan data pemeriksaan hari ini", "info");
@@ -168,32 +150,59 @@ async function lanjutPemeriksaan() {
         }
 
         renderRiwayatList(currentRiwayat, 'historyListMedis');
-        localStorage.setItem('cP_id', currentPasienId);
-        localStorage.setItem('cK_id', currentKunjunganId);
-        localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
+        localStorage.setItem('cP_id',       currentPasienId);
+        localStorage.setItem('cK_id',       currentKunjunganId);
+        localStorage.setItem('cP_riwayat',  JSON.stringify(currentRiwayat));
 
     } catch (e) {
         showToast("⚠️ Data belum sinkron: " + (e.message || 'Cek koneksi'), "warning");
-        $('historyListMedis').innerHTML =
-            `<div class="empty-state"><div class="empty-icon">⚠️</div>Gagal memuat riwayat. Bisa tetap input data.</div>`;
+        if ($('historyListMedis')) {
+            $('historyListMedis').innerHTML =
+                `<div class="empty-state"><div class="empty-icon">⚠️</div>Gagal memuat riwayat. Bisa tetap input data.</div>`;
+        }
     }
+}
+
+// ── HELPER: Isi form dari data kunjungan ──
+function _isiFormDariKunjungan(h) {
+    let tdLama = String(h.td || '');
+    if ($('sistol'))  $('sistol').value  = tdLama.includes('/') ? tdLama.split('/')[0] : tdLama;
+    if ($('diastol')) $('diastol').value = tdLama.includes('/') ? tdLama.split('/')[1] : '';
+    if ($('nadi'))    $('nadi').value    = h.nadi    || '';
+    if ($('suhu'))    $('suhu').value    = h.suhu    || '';
+    if ($('rr'))      $('rr').value      = h.rr      || '';
+    if ($('bb'))      $('bb').value      = h.bb      || '';
+    if ($('tb'))      $('tb').value      = h.tb      || '';
+    if ($('keluhan')) $('keluhan').value = h.keluhan || '';
+    if ($('fisik'))   $('fisik').value   = h.fisik   || '';
+
+    let diagLama = String(h.diag || '');
+    if (diagLama.includes(" | ")) {
+        if ($('diagnosa'))  $('diagnosa').value  = diagLama.split(" | ")[0];
+        if ($('diagnosa2')) $('diagnosa2').value = diagLama.split(" | ")[1];
+    } else {
+        if ($('diagnosa'))  $('diagnosa').value  = diagLama;
+        if ($('diagnosa2')) $('diagnosa2').value = '';
+    }
+    if ($('terapi')) $('terapi').value = h.terapi || '';
 }
 
 // ── RESET SESI PENDAFTARAN ──
 function resetSession() {
     clearSession();
-    currentPasienId = null;
+    currentPasienId    = null;
     currentKunjunganId = null;
-    currentRiwayat = [];
+    currentRiwayat     = [];
     ['nama', 'nik', 'alamat', 'tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
     if ($('jk')) $('jk').value = 'L';
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-    document.querySelectorAll('.nav-item')[0].classList.add('active-nav');
+    const firstNav = document.querySelector('.nav-item');
+    if (firstNav) firstNav.classList.add('active-nav');
     switchPage('pageDaftar', null);
     fetchByDate();
 }
 
-// ── SCAN KTP (OCR) ──
+// ── SCAN KTP (OCR via Tesseract) ──
 function initScanKtp() {
     const camInput = $('camInput');
     if (!camInput) return;
@@ -202,16 +211,16 @@ function initScanKtp() {
         if (!file) return;
         showToast("⏳ Sedang membaca KTP...", "info");
         try {
-            const result = await Tesseract.recognize(file, 'ind');
-            const text   = result.data.text;
+            const result   = await Tesseract.recognize(file, 'ind');
+            const text     = result.data.text;
             const nikMatch = text.match(/\b\d{16}\b/);
-            if (nikMatch) $('nik').value = nikMatch[0];
+            if (nikMatch && $('nik')) $('nik').value = nikMatch[0];
             const lines = text.split('\n');
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].toUpperCase().includes('NAMA')) {
                     let nama = lines[i].replace(/NAMA|:|Nama/gi, '').trim();
                     if (!nama && i + 1 < lines.length) nama = lines[i + 1].replace(/:/g, '').trim();
-                    if (nama) $('nama').value = nama;
+                    if (nama && $('nama')) $('nama').value = nama;
                     break;
                 }
             }
@@ -219,5 +228,7 @@ function initScanKtp() {
         } catch (err) {
             showToast("❌ Gagal membaca KTP", "error");
         }
+        // Reset input agar bisa scan ulang file yang sama
+        camInput.value = '';
     });
 }
