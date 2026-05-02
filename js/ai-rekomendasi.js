@@ -420,6 +420,7 @@ function isiDiagnosa(targetId, nilai) {
 // ════════════════════════════════════════════════════════
 
 async function rekomendasiAI() {
+    // Deklarasi sekali di awal — hindari duplicate const dalam satu scope
     const notif    = document.getElementById('aiNotif');
     const notifTxt = document.getElementById('aiNotifText');
 
@@ -431,7 +432,7 @@ async function rekomendasiAI() {
     if (!adaKey) {
         if (notif && notifTxt) {
             notifTxt.innerHTML =
-                '<span style="color:#b45309;">⚙️ <b>API Key AI belum dimuat.</b><br>' +
+                '<span style="color:#b45309;">⚙️ <b>API Key AI belum tersedia.</b><br>' +
                 'Buka <b>⚙️ Settings → Konfigurasi AI API Keys</b> dan pastikan key sudah terisi.<br>' +
                 '<span style="font-size:10px;opacity:.8;">Provider gratis: Groq · Gemini · OpenRouter</span></span>';
             notif.style.display = 'flex';
@@ -454,7 +455,6 @@ async function rekomendasiAI() {
     if (btnIcon)  btnIcon.innerHTML    = '<span style="display:inline-block;animation:spin .7s linear infinite">⏳</span>';
     if (btnLabel) btnLabel.textContent = 'Menganalisa...';
 
-    const notif = document.getElementById('aiNotif');
     if (notif) notif.style.display = 'none';
 
     try {
@@ -464,9 +464,8 @@ async function rekomendasiAI() {
         _tampilkanHasil(hasil, provider);
 
     } catch (e) {
-        const notifTxt = document.getElementById('aiNotifText');
         if (notif && notifTxt) {
-            notifTxt.innerHTML = `<span style="color:#ef4444;">❌ <b>Semua provider gagal.</b><br><small style="opacity:.8">${e.message}</small></span>`;
+            notifTxt.innerHTML = '<span style="color:#ef4444;">❌ <b>Semua provider gagal.</b><br><small style="opacity:.8">' + e.message + '</small></span>';
             notif.style.display = 'flex';
         }
         showToast('❌ Semua AI provider gagal', 'error');

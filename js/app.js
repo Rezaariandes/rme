@@ -57,8 +57,7 @@ async function loadRuntimeSettings() {
         if (h1   && s.klinik_title) h1.innerText   = s.klinik_title;
         if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
 
-        // Update AI Keys — hanya overwrite jika array tidak kosong
-        // BUG FIX: "[]" adalah truthy tapi tidak boleh menimpa key yang ada
+        // Update AI Keys — skip jika kosong/[]
         const providers = ['gemini','groq','openrouter','openai','mistral','cohere'];
         providers.forEach(p => {
             const rawKey = s[`ai_${p}`];
@@ -71,9 +70,7 @@ async function loadRuntimeSettings() {
                             AI_KEYS[p] = keys;
                             console.log('[Klikpro] AI key loaded: ' + p + ' (' + keys.length + ' key)');
                         }
-                    } catch(e) {
-                        console.warn('[Klikpro] Gagal parse AI key ' + p + ':', e.message);
-                    }
+                    } catch(e) {}
                 }
             }
         });
@@ -162,8 +159,7 @@ async function initApp() {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // BUG FIX: Jalankan loadRuntimeSettings PARALEL dengan initData
-    // agar AI_KEYS sudah siap saat user pertama kali membuka halaman medis
+    // Jalankan settings paralel dengan initData agar AI_KEYS cepat tersedia
     const settingsPromise = loadRuntimeSettings();
 
     // Ambil data awal dari server
@@ -189,7 +185,6 @@ async function initApp() {
 
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
 
-        // BUG FIX: settings sudah dimuat paralel di awal, tinggal tunggu selesai
         await settingsPromise;
 
     } catch (e) {
