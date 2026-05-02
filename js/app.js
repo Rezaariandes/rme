@@ -16,21 +16,77 @@ function switchPage(id, navEl) {
 
     const filterDate = document.getElementById('filterDate');
     if (id === 'pageHariIni' && filterDate && filterDate.value) fetchByDate();
-    if (id === 'pageUser') fetchUsers();
+    if (id === 'pageUser')     fetchUsers();
+    if (id === 'pageSettings') {
+        // Hanya Admin/Dokter yang boleh akses Settings
+        if (typeof loggedInUser !== 'undefined' && loggedInUser) {
+            const jabatan = (loggedInUser.jabatan || '').toLowerCase();
+            if (jabatan === 'paramedis') {
+                showToast("⛔ Akses Settings hanya untuk Admin & Dokter", "error");
+                switchPage('pageDaftar', document.querySelector('.nav-item'));
+                return;
+            }
+        }
+        if (typeof initSettings === 'function') initSettings();
+    }
+}
+
+// ── MUAT KONFIGURASI AWAL DARI SERVER (setelah login) ──
+async function loadRuntimeSettings() {
+    try {
+        const res  = await fetch(APP_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: "getSettings" })
+        });
+        const data = await res.json();
+        if (data.status !== "success" || !data.settings) return;
+
+        const s = data.settings;
+
+        // Update konstanta global
+        if (s.klinik_nama)  window.KLINIK_NAMA  = s.klinik_nama;
+        if (s.klinik_title) window.KLINIK_TITLE = s.klinik_title;
+        if (s.jabatan_medis) {
+            const jabList = s.jabatan_medis.split(',').map(j => j.trim()).filter(j => j);
+            if (jabList.length > 0) window.JABATAN_MEDIS = jabList;
+        }
+
+        // Update header
+        const h1   = document.querySelector('.app-title h1');
+        const span = document.querySelector('.app-title span');
+        if (h1   && s.klinik_title) h1.innerText   = s.klinik_title;
+        if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
+
+        // Update AI Keys
+        const providers = ['gemini','groq','openrouter','openai','mistral'];
+        providers.forEach(p => {
+            if (s[`ai_${p}`]) {
+                try {
+                    const keys = JSON.parse(s[`ai_${p}`]);
+                    if (Array.isArray(keys) && typeof AI_KEYS !== 'undefined') {
+                        AI_KEYS[p] = keys;
+                    }
+                } catch(e) {}
+            }
+        });
+
+        // Simpan data dokter aktif
+        if (data.dokter) window._dokterAktif = data.dokter;
+
+    } catch (e) {
+        // Gagal muat settings tidak kritis, lanjutkan dengan nilai default
+        console.warn('[Klikpro] Gagal muat runtime settings:', e.message);
+    }
 }
 
 // ── INISIALISASI APLIKASI ──
 async function initApp() {
-    // BUG FIX: initPinLock dipanggil di sini (setelah HTML fragment ter-inject),
-    // bukan dari auto-init di auth.js yang bisa race-condition.
     if (typeof initPinLock === 'function') initPinLock();
 
-    // Gunakan $ dari utils.js (tidak perlu deklarasi ulang)
     const today        = new Date();
     const tzOffset     = today.getTimezoneOffset() * 60000;
     const localISOTime = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
 
-    // Tampilkan tanggal di header
     const headerDate = document.getElementById('headerDate');
     if (headerDate) {
         headerDate.innerText = today.toLocaleDateString('id-ID', {
@@ -38,31 +94,21 @@ async function initApp() {
         });
     }
 
-    // Set default tanggal filter
     const filterDate = document.getElementById('filterDate');
     if (filterDate) filterDate.value = localISOTime;
 
-    // Bangun color switcher
     document.body.appendChild(buildColorSwitcher());
 
-    // Isi datalist ICD-10
-    if (typeof populateIcd10 === 'function') populateIcd10('list-icd');
-
-    // Inisialisasi OCR scan KTP
-    if (typeof initScanKtp === 'function') initScanKtp();
-
-    // Bind format tanggal lahir
+    if (typeof populateIcd10   === 'function') populateIcd10('list-icd');
+    if (typeof initScanKtp     === 'function') initScanKtp();
     if (typeof bindTglLahirFormat === 'function') bindTglLahirFormat('tgl_lahir');
 
-    // Auto-save binding
     document.querySelectorAll('[data-save="true"]').forEach(el => {
         el.addEventListener('input', () => {
             localStorage.setItem('rme_' + el.id, el.value);
         });
     });
 
-    // TTV bindings (menggunakan $ dari utils.js)
-    // BUG FIX: guard tambahan — addEventListener hanya jika elemen ada
     const bbEl      = $('bb');
     const tbEl      = $('tb');
     const sistolEl  = $('sistol');
@@ -72,13 +118,11 @@ async function initApp() {
     if (sistolEl)  sistolEl.addEventListener('input', checkTensi);
     if (diastolEl) diastolEl.addEventListener('input', checkTensi);
 
-    // Lab alert bindings
     ['lab_gds','lab_chol','lab_ua'].forEach(id => {
         const el = $(id);
         if (el) el.addEventListener('input', checkLabAlert);
     });
 
-    // Pulihkan sesi pageMedis jika ada
     if (localStorage.getItem('activePage') === 'pageMedis') {
         currentPasienId    = localStorage.getItem('cP_id');
         currentKunjunganId = localStorage.getItem('cK_id');
@@ -101,7 +145,6 @@ async function initApp() {
         }
 
         if (typeof loadAutosave === 'function') loadAutosave();
-        // Hitung IMT & cek tensi setelah autosave dimuat
         calculateIMT();
         checkTensi();
         checkLabAlert();
@@ -120,19 +163,23 @@ async function initApp() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        allPatients      = data.pasien || [];
-        kunjunganHariIni = data.hariIni || [];
+        allPatients      = data.pasien   || [];
+        kunjunganHariIni = data.hariIni  || [];
 
         const listPasien = document.getElementById('list-pasien');
         if (listPasien && allPatients.length > 0) {
             allPatients.forEach(p => {
-                const opt   = document.createElement('option');
-                opt.value   = p.nama;
+                const opt = document.createElement('option');
+                opt.value = p.nama;
                 listPasien.appendChild(opt);
             });
         }
 
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
+
+        // Muat konfigurasi runtime setelah data awal siap
+        await loadRuntimeSettings();
+
     } catch (e) {
         showToast("⚡ Gagal terhubung ke server. Cek koneksi.", "error");
     }
