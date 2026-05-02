@@ -224,18 +224,29 @@
     </div>
 
     <!-- ══════════════════════════════════════
-         SEKSI 6: GOOGLE APPS SCRIPT URL
+         SEKSI 6: KONFIGURASI OCR (SCAN KTP)
     ══════════════════════════════════════ -->
     <div class="card">
-        <div class="card-header-section">📡 Koneksi Database (Google Sheets)</div>
+        <div class="card-header-section">📷 Konfigurasi OCR (Scan KTP)</div>
         <div class="card-body">
-            <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">URL Google Apps Script yang terhubung ke spreadsheet database Anda.</div>
-            <div class="form-group position-relative">
-                <label class="form-label">Apps Script URL (APP_URL)</label>
-                <input type="text" id="cfg_app_url" class="form-control" placeholder="https://script.google.com/macros/s/..." style="font-size:11px;padding-right:40px;">
-                <button onclick="testKoneksiDB()" style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:14px;cursor:pointer;" title="Test Koneksi">🔗</button>
+            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:11.5px;color:#92400e;line-height:1.6;">
+                <b>🔑 OCR.space API Key:</b> Daftar gratis di
+                <a href="https://ocr.space/ocrapi" target="_blank" style="color:#d97706;">ocr.space/ocrapi</a>
+                untuk mendapatkan API Key. Key gratis mendukung ~500 halaman/bulan.
+                Setelah disimpan, tombol Scan KTP di halaman pendaftaran akan langsung aktif.
             </div>
-            <div id="dbStatusBadge" style="display:none;margin-top:6px;padding:7px 12px;border-radius:8px;font-size:11px;font-weight:700;"></div>
+            <div class="form-group position-relative">
+                <label class="form-label">API Key OCR.space</label>
+                <input type="password" id="cfg_ocr_api_key" class="form-control"
+                       placeholder="K88xxxxxxxxxxxxxxx"
+                       style="padding-right:44px;font-family:monospace;font-size:12px;">
+                <button onclick="togglePasswordVis('cfg_ocr_api_key', this)"
+                        style="position:absolute;right:10px;bottom:10px;background:none;border:none;font-size:14px;cursor:pointer;color:var(--text-muted);"
+                        title="Tampilkan/Sembunyikan Key">👁️</button>
+            </div>
+            <div style="font-size:10.5px;color:var(--text-muted);margin-top:-6px;margin-bottom:4px;">
+                ⚠️ Key disimpan di server (Google Sheets). Tidak ditampilkan ulang setelah refresh halaman demi keamanan.
+            </div>
         </div>
     </div>
 
@@ -247,6 +258,35 @@
         <button onclick="memuatSettings()" style="margin-top:8px;width:100%;padding:10px;border:1.5px solid var(--border);border-radius:12px;background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">
             🔄 Muat Ulang dari Server
         </button>
+    </div>
+
+    <!-- ══ MODAL KONFIRMASI HAPUS DOKTER ══ -->
+    <div class="modal-overlay" id="modalKonfirmasiHapusDokter"
+         onclick="if(event.target===this) this.classList.remove('show')">
+        <div class="modal-content" style="max-width:340px;">
+            <div style="width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 18px;"></div>
+            <div style="text-align:center;margin-bottom:16px;">
+                <div style="font-size:36px;margin-bottom:8px;">🗑️</div>
+                <div style="font-weight:800;font-size:15px;color:var(--primary-dark);">Hapus Data Dokter?</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5;">
+                    Anda akan menghapus data
+                    <b id="konfirmasiHapusDokterNama" style="color:var(--danger);"></b>.
+                    <br>Tindakan ini tidak dapat dibatalkan.
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button onclick="document.getElementById('modalKonfirmasiHapusDokter').classList.remove('show')"
+                        class="btn-custom"
+                        style="flex:1;background:#e2e8f0;color:#475569;">
+                    Batal
+                </button>
+                <button id="btnKonfirmasiHapusDokterYa"
+                        class="btn-custom"
+                        style="flex:1;background:var(--danger);color:#fff;border:none;">
+                    ✕ Ya, Hapus
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- ══ INLINE STYLES ══ -->
@@ -333,5 +373,7 @@
             font-size: 11px;
             font-weight: 700;
         }
+        /* OCR Key field */
+        #cfg_ocr_api_key::placeholder { color: #94a3b8; letter-spacing: 0.5px; }
     </style>
 </div>
