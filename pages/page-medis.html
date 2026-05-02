@@ -41,6 +41,25 @@
                     <div class="form-group">
                         <label class="form-label">Pemeriksaan Fisik</label><textarea id="fisik" class="form-control" data-save="true" placeholder="Hasil pemeriksaan fisik..." rows="2"></textarea><button class="stt-btn" onclick="startSTT('fisik')">🎙️</button>
                     </div>
+                    <!-- ── AI REKOMENDASI DIAGNOSA ── -->
+                    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                        <button onclick="rekomendasiAI()" id="btnAI" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.35);transition:all .2s;white-space:nowrap;font-family:inherit;flex-shrink:0;">
+                            <span id="btnAIIcon">✨</span><span id="btnAILabel">Rekomendasi AI</span>
+                        </button>
+                        <div id="aiNotif" style="display:none;flex:1;min-width:200px;background:linear-gradient(135deg,rgba(99,102,241,0.07),rgba(139,92,246,0.07));border:1.5px solid rgba(99,102,241,0.3);border-radius:12px;padding:9px 12px;font-size:11.5px;line-height:1.6;color:#1e1b4b;animation:aiSlideIn .3s ease;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                                <div id="aiNotifText" style="flex:1;"></div>
+                                <button onclick="tutupAINotif()" style="background:none;border:none;color:#6366f1;font-size:15px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;margin-left:4px;">✕</button>
+                            </div>
+                        </div>
+                    </div>
+                    <style>
+                        @keyframes aiSlideIn { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
+                        #btnAI:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 14px rgba(99,102,241,0.45)}
+                        #btnAI:disabled{opacity:0.7;cursor:not-allowed}
+                        .ai-chip{display:inline-block;background:rgba(99,102,241,0.12);color:#4f46e5;border-radius:20px;padding:2px 9px;font-size:10.5px;font-weight:700;margin:2px 2px 0 0;cursor:pointer;border:1px solid rgba(99,102,241,0.2);transition:all .15s;}
+                        .ai-chip:hover{background:rgba(99,102,241,0.22);}
+                    </style>
                     <div class="row g-2 mb-3">
                         <div class="col-6"><label class="form-label">Diagnosa Utama</label><input list="list-icd" id="diagnosa" class="form-control" data-save="true" placeholder="Diagnosa..."></div>
                         <div class="col-6"><label class="form-label">Diagnosa 2</label><input list="list-icd" id="diagnosa2" class="form-control" data-save="true" placeholder="Sekunder..."></div>
