@@ -41,6 +41,29 @@
                     <div class="form-group">
                         <label class="form-label">Pemeriksaan Fisik</label><textarea id="fisik" class="form-control" data-save="true" placeholder="Hasil pemeriksaan fisik..." rows="2"></textarea><button class="stt-btn" onclick="startSTT('fisik')">🎙️</button>
                     </div>
+                    <!-- ── HASIL LABORATORIUM ── -->
+                    <div class="section-divider"><span>🔬 Hasil Laboratorium</span></div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <div class="ttv-item">
+                                <label>GDS <span style="font-size:9px;font-weight:500;color:var(--text-muted);">(mg/dL)</span></label>
+                                <input type="number" id="lab_gds" placeholder="—" data-save="true" min="0" max="999">
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="ttv-item">
+                                <label>Kolesterol <span style="font-size:9px;font-weight:500;color:var(--text-muted);">(mg/dL)</span></label>
+                                <input type="number" id="lab_chol" placeholder="—" data-save="true" min="0" max="999">
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="ttv-item">
+                                <label>Asam Urat <span style="font-size:9px;font-weight:500;color:var(--text-muted);">(mg/dL)</span></label>
+                                <input type="number" id="lab_ua" placeholder="—" step="0.1" data-save="true" min="0" max="30">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="labAlert" style="display:none;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;margin-bottom:10px;background:rgba(239,68,68,0.09);color:#dc2626;border:1px solid rgba(239,68,68,0.25);"></div>
                     <!-- ── AI REKOMENDASI DIAGNOSA ── -->
                     <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
                         <button onclick="rekomendasiAI()" id="btnAI" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.35);transition:all .2s;white-space:nowrap;font-family:inherit;flex-shrink:0;">
