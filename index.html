@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klikpro RME — Praktek Dokter Reza Ariandes</title>
+    <title>Klikpro RME — Praktek Dokter</title>
 
     <!-- ═══════════════════════════════════════════════════════════
-         KONFIGURASI KLINIK & DATABASE
-         Sesuaikan bagian ini dengan data klinik Anda
+         KONFIGURASI MINIMAL — Nilai sebenarnya dimuat dari
+         Google Sheets (sheet: Konfigurasi) saat app berjalan.
+         Hanya APP_URL & BASE_URL yang perlu diubah di sini.
     ═══════════════════════════════════════════════════════════ -->
     <script>
-        const APP_URL = 'https://script.google.com/macros/s/AKfycbxHcyvfQm9KeJYt0Be3d_wo8_OZO9uOyGYf1ELFg0IFZmFG8HHiKM7ulNO4oiS2eycA/exec';
-
-        const KLINIK_NAMA   = 'Praktek Dokter Reza Ariandes';
-        const KLINIK_TITLE  = 'Klikpro RME';
-        const JABATAN_MEDIS = ['Dokter', 'Admin', 'Paramedis'];
-
+        // ─── WAJIB DIISI: URL Google Apps Script ───
+        const APP_URL  = 'https://script.google.com/macros/s/AKfycbxHcyvfQm9KeJYt0Be3d_wo8_OZO9uOyGYf1ELFg0IFZmFG8HHiKM7ulNO4oiS2eycA/exec';
         const BASE_URL = 'https://raw.githubusercontent.com/Rezaariandes/rme/main';
 
+        // ─── NILAI DEFAULT (akan di-override oleh data dari Sheets) ───
+        let KLINIK_NAMA   = 'Praktek Dokter';
+        let KLINIK_TITLE  = 'Klikpro RME';
+        let JABATAN_MEDIS = ['Dokter', 'Admin', 'Paramedis'];
+
+        // AI_KEYS — akan di-override dari Sheets setelah login
+        // Isi sementara jika perlu testing sebelum settings dikonfigurasi
+        let AI_KEYS = {
+            gemini:     ['', '', ''],
+            groq:       ['', '', ''],
+            openrouter: ['', ''],
+            openai:     ['', ''],
+            mistral:    ['', ''],
+            cohere:     [''],
+        };
+
+        // ─── URL Fragment (HTML & JS) ───
         const FRAGMENT_URLS = {
             css:          BASE_URL + '/css/style.css',
             pinLock:      BASE_URL + '/components/pin-lock.html',
@@ -29,16 +43,18 @@
             pageMedis:    BASE_URL + '/pages/page-medis.html',
             pageHariIni:  BASE_URL + '/pages/page-hari-ini.html',
             pageUser:     BASE_URL + '/pages/page-user.html',
+            pageSettings: BASE_URL + '/pages/page-settings.html',   // ← BARU
 
-            jsUtils:  BASE_URL + '/js/utils.js',
-            jsAuth:   BASE_URL + '/js/auth.js',
-            jsIcd10:  BASE_URL + '/js/icd10.js',
-            jsPasien: BASE_URL + '/js/pasien.js',
-            jsKunj:   BASE_URL + '/js/kunjungan.js',
-            jsModal:  BASE_URL + '/js/modal.js',
-            jsUser:   BASE_URL + '/js/user.js',
-            jsApp:    BASE_URL + '/js/app.js',
-            jsAiRek:  BASE_URL + '/js/ai-rekomendasi.js'
+            jsUtils:    BASE_URL + '/js/utils.js',
+            jsAuth:     BASE_URL + '/js/auth.js',
+            jsIcd10:    BASE_URL + '/js/icd10.js',
+            jsPasien:   BASE_URL + '/js/pasien.js',
+            jsKunj:     BASE_URL + '/js/kunjungan.js',
+            jsModal:    BASE_URL + '/js/modal.js',
+            jsUser:     BASE_URL + '/js/user.js',
+            jsSettings: BASE_URL + '/js/settings.js',               // ← BARU
+            jsApp:      BASE_URL + '/js/app.js',
+            jsAiRek:    BASE_URL + '/js/ai-rekomendasi.js'
         };
     </script>
 
@@ -50,7 +66,6 @@
     <style id="dynamic-style"></style>
 
     <style>
-        /* ── Loading & Error Overlay ── */
         #app-loading {
             position: fixed; inset: 0;
             background: linear-gradient(160deg, #f0f6ff 0%, #e8f4ff 100%);
@@ -66,13 +81,8 @@
             border-radius: 50%;
             animation: spin 0.75s linear infinite;
         }
-        #app-loading .loading-label {
-            color: #334155; font-weight: 700; font-size: 14px;
-        }
-        #app-loading .loading-sub {
-            color: #64748b; font-size: 11px; font-weight: 500;
-            margin-top: -8px;
-        }
+        #app-loading .loading-label { color: #334155; font-weight: 700; font-size: 14px; }
+        #app-loading .loading-sub   { color: #64748b; font-size: 11px; font-weight: 500; margin-top: -8px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         #app-error {
@@ -85,8 +95,7 @@
         #app-error strong { font-size: 1.1rem; }
         #app-error p { font-size: .88rem; max-width: 420px; color: #64748b; line-height: 1.6; }
         #app-error button {
-            padding: 10px 28px;
-            background: #3b82f6; color: white;
+            padding: 10px 28px; background: #3b82f6; color: white;
             border: none; border-radius: 10px;
             font-weight: 700; cursor: pointer;
             font-family: 'Sora', sans-serif;
@@ -96,14 +105,12 @@
 </head>
 <body>
 
-    <!-- ── Loading Overlay ── -->
     <div id="app-loading">
         <div class="spinner"></div>
         <p class="loading-label">Menyiapkan Klikpro RME...</p>
         <p class="loading-sub" id="loadingStep">Menghubungkan ke server...</p>
     </div>
 
-    <!-- ── Error Overlay ── -->
     <div id="app-error">
         <div style="font-size:3rem">⚠️</div>
         <strong>Gagal Memuat Aplikasi</strong>
@@ -111,7 +118,6 @@
         <button onclick="location.reload()">🔄 Coba Lagi</button>
     </div>
 
-    <!-- ── App Root ── -->
     <div id="app-root" style="display:none;">
         <div class="bg-base"></div>
         <div class="bg-mesh"><div class="bg-orb"></div></div>
@@ -129,29 +135,26 @@
         <div id="slot-page-medis"></div>
         <div id="slot-page-hari-ini"></div>
         <div id="slot-page-user"></div>
+        <div id="slot-page-settings"></div>   <!-- ← BARU -->
     </div>
 
     <script>
-    // ─── HELPER: Update teks status loading ───
     function setLoadStep(msg) {
         const el = document.getElementById('loadingStep');
         if (el) el.textContent = msg;
     }
 
-    // ─── HELPER: Inject & execute script text ───
     function injectScript(text) {
         const el = document.createElement('script');
         el.textContent = text;
         document.body.appendChild(el);
     }
 
-    // ─── BOOTSTRAP UTAMA ───
     async function bootstrap() {
         try {
-            // 1. Fetch HTML fragments & CSS secara paralel
             setLoadStep('Mengunduh tampilan...');
             const htmlKeys = ['css','pinLock','modalRiwayat','modalUser','header','nav',
-                              'pageDaftar','pageMedis','pageHariIni','pageUser'];
+                              'pageDaftar','pageMedis','pageHariIni','pageUser','pageSettings'];
             const htmlResults = await Promise.all(
                 htmlKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
@@ -161,9 +164,8 @@
                 )
             );
             const [css, pinLock, modalRiwayat, modalUser, header, nav,
-                   pageDaftar, pageMedis, pageHariIni, pageUser] = htmlResults;
+                   pageDaftar, pageMedis, pageHariIni, pageUser, pageSettings] = htmlResults;
 
-            // 2. Inject CSS & HTML
             setLoadStep('Memuat antarmuka...');
             document.getElementById('dynamic-style').innerHTML = css;
             document.getElementById('slot-pin-lock').innerHTML        = pinLock;
@@ -175,16 +177,17 @@
             document.getElementById('slot-page-medis').innerHTML      = pageMedis;
             document.getElementById('slot-page-hari-ini').innerHTML   = pageHariIni;
             document.getElementById('slot-page-user').innerHTML       = pageUser;
+            document.getElementById('slot-page-settings').innerHTML   = pageSettings;  // ← BARU
 
-            // Terapkan nama klinik
+            // Nama klinik sementara (akan diupdate setelah loadSettings)
             const h1   = document.querySelector('.app-title h1');
             const span = document.querySelector('.app-title span');
             if (h1)   h1.innerText   = KLINIK_TITLE;
             if (span) span.innerText = KLINIK_NAMA;
 
-            // 3. Fetch semua JS secara paralel (hemat waktu ~40%)
             setLoadStep('Memuat modul aplikasi...');
-            const jsKeys = ['jsUtils','jsAuth','jsIcd10','jsPasien','jsKunj','jsModal','jsUser','jsApp','jsAiRek'];
+            const jsKeys = ['jsUtils','jsAuth','jsIcd10','jsPasien','jsKunj',
+                            'jsModal','jsUser','jsSettings','jsApp','jsAiRek'];
             const jsTexts = await Promise.all(
                 jsKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
@@ -194,24 +197,15 @@
                 )
             );
 
-            // 4. Eksekusi JS tetap BERURUTAN agar dependency tidak rusak
             setLoadStep('Menginisialisasi sistem...');
             for (const scriptText of jsTexts) {
-                try {
-                    injectScript(scriptText);
-                } catch (e) {
-                    console.warn('Peringatan eksekusi modul:', e);
-                }
+                try { injectScript(scriptText); } catch (e) { console.warn('Peringatan:', e); }
             }
 
-            // 5. Tampilkan app
             document.getElementById('app-loading').style.display = 'none';
             document.getElementById('app-root').style.display    = 'block';
 
-            // 6. Panggil initApp
-            if (typeof initApp === 'function') {
-                initApp();
-            }
+            if (typeof initApp === 'function') initApp();
 
         } catch (err) {
             document.getElementById('app-loading').style.display = 'none';
