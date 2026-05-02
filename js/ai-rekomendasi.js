@@ -271,46 +271,87 @@ function _kumpulkanDataKlinis() {
         imtStr = `${imt} (${kat})`;
     }
 
+    // ── Hasil Laboratorium ──
+    const lab_gds  = get('lab_gds');
+    const lab_chol = get('lab_chol');
+    const lab_ua   = get('lab_ua');
+
+    function interpretLab(val, type) {
+        const n = parseFloat(val);
+        if (isNaN(n) || val === '') return null;
+        if (type === 'gds') {
+            if (n < 70)   return { val: n, unit: 'mg/dL', status: 'RENDAH — Hipoglikemia', flag: '🔴' };
+            if (n <= 99)  return { val: n, unit: 'mg/dL', status: 'Normal (70-99)', flag: '🟢' };
+            if (n <= 199) return { val: n, unit: 'mg/dL', status: 'Pra-diabetes / Pre-DM', flag: '🟡' };
+            return        { val: n, unit: 'mg/dL', status: 'TINGGI — Suspek DM', flag: '🔴' };
+        }
+        if (type === 'chol') {
+            if (n < 200)  return { val: n, unit: 'mg/dL', status: 'Normal (<200)', flag: '🟢' };
+            if (n <= 239) return { val: n, unit: 'mg/dL', status: 'Batas tinggi (200-239)', flag: '🟡' };
+            return        { val: n, unit: 'mg/dL', status: 'TINGGI — Hiperlipidemia', flag: '🔴' };
+        }
+        if (type === 'ua') {
+            if (n <= 6.0) return { val: n, unit: 'mg/dL', status: 'Normal wanita (≤6.0)', flag: '🟢' };
+            if (n <= 7.0) return { val: n, unit: 'mg/dL', status: 'Normal pria (≤7.0)', flag: '🟢' };
+            return        { val: n, unit: 'mg/dL', status: 'TINGGI — Hiperurisemia', flag: '🔴' };
+        }
+        return null;
+    }
+
+    const labGds  = interpretLab(lab_gds,  'gds');
+    const labChol = interpretLab(lab_chol, 'chol');
+    const labUa   = interpretLab(lab_ua,   'ua');
+    const adaLab  = !!(labGds || labChol || labUa);
+
     return {
         umurText, jkLabel, tdStr,
         nadi: nadi || '-', suhu: suhu || '-',
         rr:   rr   || '-', bb:   bb   || '-',
         tb:   tb   || '-', imt:  imtStr,
         keluhan: get('keluhan') || '-',
-        fisik:   get('fisik')   || '-'
+        fisik:   get('fisik')   || '-',
+        labGds, labChol, labUa, adaLab
     };
 }
 
 function _buatPrompt(data) {
-    return `Kamu adalah asisten klinis dokter yang membantu memberikan rekomendasi diagnosa berdasarkan data anamnesis dan pemeriksaan.
+    // Bangun bagian lab secara dinamis
+    const labLines = [];
+    if (data.labGds)  labLines.push('- Gula Darah Sewaktu (GDS)  : ' + data.labGds.val  + ' ' + data.labGds.unit  + ' — ' + data.labGds.flag  + ' ' + data.labGds.status);
+    if (data.labChol) labLines.push('- Kolesterol Total           : ' + data.labChol.val + ' ' + data.labChol.unit + ' — ' + data.labChol.flag + ' ' + data.labChol.status);
+    if (data.labUa)   labLines.push('- Asam Urat                  : ' + data.labUa.val  + ' ' + data.labUa.unit  + ' — ' + data.labUa.flag  + ' ' + data.labUa.status);
 
-DATA PASIEN:
-- Usia: ${data.umurText}
-- Jenis Kelamin: ${data.jkLabel}
+    const bagianLab = labLines.length > 0
+        ? '\n\nHASIL LABORATORIUM:\n' + labLines.join('\n')
+        : '';
 
-TANDA-TANDA VITAL:
-- Tekanan Darah: ${data.tdStr}
-- Nadi: ${data.nadi} x/mnt
-- Suhu: ${data.suhu} °C
-- Laju Napas (RR): ${data.rr} x/mnt
-- Berat Badan: ${data.bb} kg | Tinggi: ${data.tb} cm | IMT: ${data.imt}
+    const instruksiLab = labLines.length > 0
+        ? 'Perhatikan nilai laboratorium — jika ada nilai abnormal, pastikan tercermin dalam prioritas diagnosa.'
+        : '';
 
-ANAMNESIS (Keluhan Utama):
-${data.keluhan}
-
-PEMERIKSAAN FISIK:
-${data.fisik}
-
-TUGAS:
-Berikan 2-3 kemungkinan diagnosa yang paling relevan berdasarkan data di atas. Format jawaban HARUS seperti ini (jangan ada teks lain di luar format):
-
-DIAGNOSA_1: [kode ICD-10 dan nama diagnosa]
-DIAGNOSA_2: [kode ICD-10 dan nama diagnosa]
-DIAGNOSA_3: [kode ICD-10 dan nama diagnosa, atau tulis TIDAK_ADA jika hanya ada 2]
-ALASAN: [penjelasan singkat 1-2 kalimat mengapa diagnosa tersebut direkomendasikan]
-
-Catatan: ini adalah alat bantu klinis, keputusan akhir tetap pada dokter. Gunakan kode ICD-10 yang umum dipakai di Indonesia.`;
+    return 'Kamu adalah asisten klinis dokter yang membantu memberikan rekomendasi diagnosa berdasarkan data anamnesis, pemeriksaan fisik' + (labLines.length > 0 ? ', dan hasil laboratorium' : '') + '.\n\n' +
+        'DATA PASIEN:\n' +
+        '- Usia: ' + data.umurText + '\n' +
+        '- Jenis Kelamin: ' + data.jkLabel + '\n\n' +
+        'TANDA-TANDA VITAL:\n' +
+        '- Tekanan Darah: ' + data.tdStr + '\n' +
+        '- Nadi: ' + data.nadi + ' x/mnt\n' +
+        '- Suhu: ' + data.suhu + ' \u00b0C\n' +
+        '- Laju Napas (RR): ' + data.rr + ' x/mnt\n' +
+        '- Berat Badan: ' + data.bb + ' kg | Tinggi: ' + data.tb + ' cm | IMT: ' + data.imt +
+        bagianLab + '\n\n' +
+        'ANAMNESIS (Keluhan Utama):\n' + data.keluhan + '\n\n' +
+        'PEMERIKSAAN FISIK:\n' + data.fisik + '\n\n' +
+        'TUGAS:\n' +
+        'Berikan 2-3 kemungkinan diagnosa yang paling relevan berdasarkan SELURUH data di atas. ' + instruksiLab + '\n' +
+        'Format jawaban HARUS seperti ini (jangan ada teks lain di luar format):\n\n' +
+        'DIAGNOSA_1: [kode ICD-10 dan nama diagnosa]\n' +
+        'DIAGNOSA_2: [kode ICD-10 dan nama diagnosa]\n' +
+        'DIAGNOSA_3: [kode ICD-10 dan nama diagnosa, atau tulis TIDAK_ADA jika hanya ada 2]\n' +
+        'ALASAN: [penjelasan singkat 1-2 kalimat yang menyebut data kunci — termasuk nilai lab jika relevan — yang mendukung diagnosa]\n\n' +
+        'Catatan: ini adalah alat bantu klinis, keputusan akhir tetap pada dokter. Gunakan kode ICD-10 yang umum dipakai di Indonesia.';
 }
+
 
 function _parseResponAI(teks) {
     const baris = teks.split('\n').map(b => b.trim()).filter(Boolean);
