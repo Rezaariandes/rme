@@ -18,12 +18,15 @@ function tutupAINotif() {
 function _kumpulkanDataKlinis() {
     const get = id => {
         const el = document.getElementById(id);
-        return el ? el.value.trim() : '';
+        if (!el) return '';
+        // Elemen non-input (span, div, strong) tidak punya .value — gunakan innerText
+        const val = (el.value !== undefined && el.value !== null) ? el.value : el.innerText;
+        return val ? String(val).trim() : '';
     };
 
-    const namaPasien = get('infoPasienNama') || document.getElementById('infoPasienNama')?.innerText || '';
-    const umurText   = document.getElementById('infoPasienUmur')?.innerText || '';
-    const jk         = get('jk') || (document.getElementById('jk')?.value) || '';
+    const namaPasien = get('infoPasienNama');
+    const umurText   = get('infoPasienUmur');
+    const jk         = get('jk');
     const jkLabel    = jk === 'L' ? 'Laki-laki' : jk === 'P' ? 'Perempuan' : jk;
 
     // TTV
