@@ -5,7 +5,7 @@
 //      https://aistudio.google.com/app/apikey
 // ════════════════════════════════════════════════════════
 
-const GEMINI_API_KEY = 'ISI_API_KEY_GEMINI_ANDA_DISINI';
+const GEMINI_API_KEY = 'AIzaSyDQDqs7NEIxO1w2hDgziz-aLAS_FoqXUos';
 const GEMINI_URL     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + GEMINI_API_KEY;
 
 // ── TUTUP NOTIF AI ──
