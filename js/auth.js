@@ -170,7 +170,7 @@ function applyRoleRestrictions() {
 
     const jabatan     = loggedInUser.jabatan;
     const bolehMedis  = JABATAN_MEDIS.includes(jabatan);
-    const isPerawat   = jabatan === 'Perawat';
+    const isParamedis   = jabatan === 'Paramedis';
 
     // Tombol lanjut periksa
     const btnNext = $('btnNext');
@@ -184,18 +184,18 @@ function applyRoleRestrictions() {
 
     // ── PERAWAT: Sembunyikan diagnosa di form ──
     const rowDiagnosa = document.querySelector('#diagnosa')?.closest('.row');
-    if (rowDiagnosa) rowDiagnosa.style.display = isPerawat ? 'none' : '';
+    if (rowDiagnosa) rowDiagnosa.style.display = isParamedis ? 'none' : '';
 
     // ── PERAWAT: Sembunyikan nav item halaman User ──
     document.querySelectorAll('.nav-item').forEach(navEl => {
         const onclick = navEl.getAttribute('onclick') || '';
         if (onclick.includes('pageUser')) {
-            navEl.style.display = isPerawat ? 'none' : '';
+            navEl.style.display = isParamedis ? 'none' : '';
         }
     });
 
     // Simpan flag ke window supaya bisa diakses modul lain (render riwayat, dll.)
-    window._isPerawat = isPerawat;
+    window._isParamedis = isParamedis;
 
     if (!bolehMedis && localStorage.getItem('activePage') === 'pageMedis') {
         localStorage.removeItem('activePage');

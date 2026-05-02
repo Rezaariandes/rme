@@ -46,7 +46,7 @@ function openModal(index) {
     toggleEditModal(false);
 
     // Sembunyikan baris diagnosa untuk Perawat
-    const isPerawat = window._isPerawat === true;
+    const isPerawat = window._isParamedis === true;
     ['viewDiag', 'modalDiag1', 'modalDiag2'].forEach(id => {
         const el = $(id);
         if (el) el.closest('.col-6, .form-group, div') && (el.parentElement.style.display = isPerawat ? 'none' : '');

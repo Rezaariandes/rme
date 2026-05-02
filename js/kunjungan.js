@@ -47,7 +47,7 @@ function renderKunjunganHariIni() {
 
     container.innerHTML = sorted.map(h => {
         const isDone    = h.status === 'Selesai';
-        const diagRow   = window._isPerawat ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
+        const diagRow   = window._isParamedis ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.62' : '1'};" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div class="visit-time-badge">${h.waktu || '-'}</div>
@@ -249,7 +249,7 @@ function renderRiwayatList(riwayatArr, containerId) {
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
                         <b>TTV:</b> TD ${r.td||'-'} | N ${r.nadi||'-'} | S ${r.suhu||'-'} | RR ${r.rr||'-'} | BB ${r.bb||'-'}
                     </div>
-                    ${window._isPerawat ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
+                    ${window._isParamedis ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
                     <div class="riwayat-keluhan" style="color:var(--text); border-top:1px dashed var(--border); padding-top:4px; margin-bottom:3px;"><b>Keluhan:</b> ${r.keluhan || '-'}</div>
                     <div class="riwayat-keluhan" style="color:var(--text);"><b>Terapi:</b> ${r.terapi || '-'}</div>
                 </div>
