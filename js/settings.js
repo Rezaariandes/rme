@@ -50,7 +50,6 @@ async function memuatSettings() {
 function _fallbackDariKonstanta() {
     _setVal('cfg_klinik_nama',  typeof KLINIK_NAMA  !== 'undefined' ? KLINIK_NAMA  : '');
     _setVal('cfg_klinik_title', typeof KLINIK_TITLE !== 'undefined' ? KLINIK_TITLE : '');
-    _setVal('cfg_app_url',      typeof APP_URL      !== 'undefined' ? APP_URL      : '');
     _setVal('cfg_jabatan_medis',
         typeof JABATAN_MEDIS !== 'undefined' ? JABATAN_MEDIS.join(', ') : 'Dokter, Admin, Paramedis');
     _renderDokterList();
@@ -67,7 +66,8 @@ function _isiFormDariSettings(s) {
     _setVal('cfg_klinik_telp',       s.klinik_telp       || '');
     _setVal('cfg_klinik_email',      s.klinik_email      || '');
     _setVal('cfg_jabatan_medis',     s.jabatan_medis     || 'Dokter, Admin, Paramedis');
-    _setVal('cfg_app_url',           s.app_url           || (typeof APP_URL !== 'undefined' ? APP_URL : ''));
+    // OCR API Key — ditampilkan sebagai field terproteksi, isi dari server
+    _setVal('cfg_ocr_api_key',       s.ocr_api_key       || '');
     _setVal('cfg_ss_env',            s.ss_env            || 'development');
     _setVal('cfg_ss_org_id',         s.ss_org_id         || '');
     _setVal('cfg_ss_client_id',      s.ss_client_id      || '');
@@ -89,7 +89,7 @@ function _renderDokterList() {
 
     container.innerHTML = _dokterList.map((d, i) => `
         <div class="dokter-row" id="dokter_row_${i}">
-            <button class="btn-hapus-dokter" onclick="hapusDokterRow(${i})">✕ Hapus</button>
+            <button class="btn-hapus-dokter" onclick="konfirmasiHapusDokter(${i}, '${escHtml(d.nama || 'dokter ini')}')">✕ Hapus</button>
             <div class="row g-2 mb-2">
                 <div class="col-8">
                     <label class="form-label" style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px;">Nama Lengkap + Gelar</label>
@@ -134,6 +134,30 @@ function tambahBarisDokter() {
     // Scroll ke row terbaru
     const rows = document.querySelectorAll('.dokter-row');
     if (rows.length > 0) rows[rows.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+// ── KONFIRMASI HAPUS DOKTER (mencegah hapus tidak sengaja) ──
+function konfirmasiHapusDokter(i, nama) {
+    const modal   = $('modalKonfirmasiHapusDokter');
+    const labelEl = $('konfirmasiHapusDokterNama');
+    const btnYa   = $('btnKonfirmasiHapusDokterYa');
+
+    if (modal && labelEl && btnYa) {
+        labelEl.textContent = nama;
+        // Clone button untuk hapus event listener lama (cegah duplikasi handler)
+        const newBtn = btnYa.cloneNode(true);
+        btnYa.parentNode.replaceChild(newBtn, btnYa);
+        $('btnKonfirmasiHapusDokterYa').onclick = () => {
+            hapusDokterRow(i);
+            modal.classList.remove('show');
+        };
+        modal.classList.add('show');
+    } else {
+        // Fallback: browser confirm jika modal belum ada di HTML
+        if (confirm('Hapus data "' + nama + '"? Tindakan ini tidak dapat dibatalkan.')) {
+            hapusDokterRow(i);
+        }
+    }
 }
 
 function hapusDokterRow(i) {
@@ -262,19 +286,22 @@ async function simpanSemuaSettings() {
 
         // Konfigurasi sistem
         jabatan_medis: _getVal('cfg_jabatan_medis'),
-        app_url:       _getVal('cfg_app_url'),
+
+        // OCR API Key — hanya simpan jika diisi (kosong = pertahankan nilai lama di server)
+        ocr_api_key:  _getVal('cfg_ocr_api_key'),
 
         // Satu Sehat
         ss_env:           _getVal('cfg_ss_env'),
         ss_org_id:        _getVal('cfg_ss_org_id'),
         ss_client_id:     _getVal('cfg_ss_client_id'),
-        ss_client_secret: _getVal('cfg_ss_client_secret'), // hanya jika diisi
+        ss_client_secret: _getVal('cfg_ss_client_secret'),
 
         // AI Keys
         ...aiKeysPayload,
 
         // Data dokter
         dokter: JSON.stringify(dokterPayload)
+        // Catatan: APP_URL tidak dikirim dari Settings — ubah langsung di index.html
     };
 
     try {
@@ -315,6 +342,11 @@ function _terapkanSettingsRuntime(s, dokter) {
     if (s.jabatan_medis) {
         const jabList = s.jabatan_medis.split(',').map(j => j.trim()).filter(j => j);
         if (jabList.length > 0) window.JABATAN_MEDIS = jabList;
+    }
+
+    // Update OCR key runtime — langsung berlaku untuk scan KTP berikutnya
+    if (s.ocr_api_key && s.ocr_api_key.trim() !== '') {
+        window.OCR_API_KEY = s.ocr_api_key.trim();
     }
 
     // Update AI Keys global
