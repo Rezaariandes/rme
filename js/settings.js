@@ -156,10 +156,10 @@ function _kumpulkanDokter() {
 // ────────────────────────────────────────
 //  RENDER AI KEYS DARI SETTINGS
 // ────────────────────────────────────────
-const AI_PROVIDERS = ['gemini','groq','openrouter','openai','mistral'];
+const AI_PROVIDER_NAMES = ['gemini','groq','openrouter','openai','mistral'];
 
 function _renderAiKeys(s) {
-    AI_PROVIDERS.forEach(provider => {
+    AI_PROVIDER_NAMES.forEach(provider => {
         const container = $(`${provider}_keys_container`);
         if (!container) return;
 
@@ -242,7 +242,7 @@ async function simpanSemuaSettings() {
 
     // Kumpulkan AI keys per provider
     const aiKeysPayload = {};
-    AI_PROVIDERS.forEach(p => {
+    AI_PROVIDER_NAMES.forEach(p => {
         const keys = (window[`_aiKeys_${p}`] || []).filter(k => k && k.trim() !== '');
         aiKeysPayload[`ai_${p}`] = JSON.stringify(keys);
     });
@@ -318,7 +318,7 @@ function _terapkanSettingsRuntime(s, dokter) {
     }
 
     // Update AI Keys global
-    AI_PROVIDERS.forEach(p => {
+    AI_PROVIDER_NAMES.forEach(p => {
         if (s[`ai_${p}`]) {
             try {
                 const keys = JSON.parse(s[`ai_${p}`]);

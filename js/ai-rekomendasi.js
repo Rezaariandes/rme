@@ -420,18 +420,20 @@ function isiDiagnosa(targetId, nilai) {
 // ════════════════════════════════════════════════════════
 
 async function rekomendasiAI() {
+    const notif    = document.getElementById('aiNotif');
+    const notifTxt = document.getElementById('aiNotifText');
+
     // Cek apakah ada minimal 1 key yang diisi
     const adaKey = AI_PROVIDERS.some(p =>
         p.enabled && (p.keys || []).some(k => k && k.trim() !== '')
     );
 
     if (!adaKey) {
-        const notif    = document.getElementById('aiNotif');
-        const notifTxt = document.getElementById('aiNotifText');
         if (notif && notifTxt) {
             notifTxt.innerHTML =
-                `<span style="color:#ef4444;">⚙️ <b>Belum ada API Key.</b> Isi minimal 1 key di file <code>ai-rekomendasi.js</code>.<br>` +
-                `Provider tersedia: Gemini · Groq · OpenRouter · OpenAI · Mistral · Cohere</span>`;
+                `<span style="color:#b45309;">⚙️ <b>Belum ada API Key AI.</b><br>` +
+                `Buka menu <b>⚙️ Settings → API Key AI</b> dan isi minimal 1 key.<br>` +
+                `<span style="font-size:10px;opacity:.8;">Provider gratis: Gemini (aistudio.google.com) · Groq (console.groq.com) · OpenRouter (openrouter.ai)</span></span>`;
             notif.style.display = 'flex';
         }
         return;
