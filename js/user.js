@@ -1,27 +1,32 @@
 // ════════════════════════════════════════════════════════
-//  KLIKPRO RME — MODUL USER
+//  KLIKPRO RME — MODUL USER (SUPABASE VERSION)
 //  Manajemen akun user & PIN
-//  KEAMANAN: PIN tidak pernah ditampilkan ke frontend
 // ════════════════════════════════════════════════════════
 
 let userListCache = [];
 
-// ── AMBIL DAFTAR USER DARI SERVER ──
+// ── AMBIL DAFTAR USER DARI SUPABASE ──
 async function fetchUsers() {
     const listEl = $('listUserContainer');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data user...</div>`;
+    
     try {
-        const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify({ action: "getUsers" }) });
-        const data = await res.json();
-        // Simpan cache tanpa field PIN (PIN tidak boleh dikirim ke frontend)
-        userListCache = (data.data || data.users || []).map(u => ({
-            id:      u.id,
+        const { data, error } = await supabase
+            .from('users')
+            .select('id_user, nama, jabatan');
+
+        if (error) throw error;
+
+        // Simpan cache tanpa field PIN
+        userListCache = data.map(u => ({
+            id:      u.id_user,
             nama:    u.nama,
             jabatan: u.jabatan
-            // PIN sengaja tidak disimpan di frontend
         }));
+        
         renderUserList();
     } catch (e) {
+        console.error("Fetch users error:", e);
         if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div>Gagal memuat daftar user.</div>`;
     }
 }
@@ -46,7 +51,7 @@ function renderUserList() {
     `).join('');
 }
 
-// ── SIMPAN USER BARU ──
+// ── SIMPAN USER BARU KE SUPABASE ──
 async function simpanUserBaru() {
     const nama    = $('u_nama')    ? $('u_nama').value.trim()    : '';
     const jabatan = $('u_jabatan') ? $('u_jabatan').value.trim() : '';
@@ -59,17 +64,33 @@ async function simpanUserBaru() {
     if (btn) { btn.disabled = true; btn.innerText = "Menyimpan..."; }
 
     try {
-        await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "saveUser", nama, jabatan, pin })
-        });
+        // Generate ID User baru
+        const newId = "U-" + Math.random().toString(36).substr(2, 6).toUpperCase();
+        
+        const { error } = await supabase
+            .from('users')
+            .insert([{ 
+                id_user: newId, 
+                nama: nama, 
+                jabatan: jabatan, 
+                pin: pin 
+            }]);
+
+        if (error) throw error;
+
         showToast("✅ User baru berhasil disimpan", "success");
+        
+        // Bersihkan Form
         if ($('u_nama'))    $('u_nama').value    = '';
         if ($('u_jabatan')) $('u_jabatan').value = 'Admin';
         if ($('u_pin'))     $('u_pin').value     = '';
+        
+        // Refresh UI
         fetchUsers();
         if (typeof loadLoginUsers === "function") loadLoginUsers();
+        
     } catch (e) {
+        console.error("Save user error:", e);
         showToast("❌ Gagal menyimpan user", "error");
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = "💾 Simpan Akun User"; }
@@ -83,37 +104,40 @@ function openEditUserModal(id) {
     if ($('edit_u_id'))      $('edit_u_id').value      = u.id;
     if ($('edit_u_nama'))    $('edit_u_nama').value    = u.nama;
     if ($('edit_u_jabatan')) $('edit_u_jabatan').value = u.jabatan;
-    // Tidak pre-fill PIN — user harus ketik PIN baru
-    if ($('edit_u_pin'))     $('edit_u_pin').value     = '';
+    if ($('edit_u_pin'))     $('edit_u_pin').value     = ''; // Kosongkan form PIN
+    
     const modal = $('modalUser');
     if (modal) modal.classList.add('show');
 }
 
-// ── UPDATE PIN USER ──
+// ── UPDATE PIN USER DI SUPABASE ──
 async function updatePinUser() {
-    const id     = $('edit_u_id')  ? $('edit_u_id').value              : '';
+    const id     = $('edit_u_id')  ? $('edit_u_id').value         : '';
     const newPin = $('edit_u_pin') ? $('edit_u_pin').value.trim() : '';
+    
     if (!newPin || newPin.length < 4) return showToast("⚠️ PIN minimal 4 digit", "warning");
 
     const btn = $('btnUpdateUser');
     if (btn) { btn.disabled = true; btn.innerText = "Mengupdate..."; }
 
     try {
-        await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "saveUser", userId: id, pin: newPin })
-        });
+        const { error } = await supabase
+            .from('users')
+            .update({ pin: newPin })
+            .eq('id_user', id);
+
+        if (error) throw error;
+
         showToast("✅ PIN berhasil diupdate", "success");
+        
         const modal = $('modalUser');
         if (modal) modal.classList.remove('show');
+        
         fetchUsers();
     } catch (e) {
+        console.error("Update PIN error:", e);
         showToast("❌ Gagal update PIN", "error");
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = "💾 Update User"; }
     }
 }
-
-// ── AUTO-INIT: dipanggil dari initApp() setelah fragment HTML ter-inject ──
-// BUG FIX: auto-init dihapus; fetchUsers() dipanggil dari switchPage/initApp
-// sehingga elemen #listUserContainer sudah pasti ada di DOM.
