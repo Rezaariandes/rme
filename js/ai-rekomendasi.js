@@ -2,34 +2,17 @@
 //  KLIKPRO RME — MODUL AI REKOMENDASI DIAGNOSA
 //  Sistem Multi-Provider dengan Auto-Fallback
 //
-//  CARA MENGISI API KEY:
-//  1. Isi key pada provider yang Anda miliki
-//  2. Kosongkan string ('') untuk provider yang tidak dipakai
-//  3. Urutan provider = urutan prioritas fallback
-//
-//  DAFTAR PROVIDER & LINK DAFTAR KEY GRATIS:
-//  ┌─────────────┬──────────────────────────────────────────────────┐
-//  │ GEMINI      │ https://aistudio.google.com/app/apikey           │
-//  │ GROQ        │ https://console.groq.com/keys                    │
-//  │ OPENROUTER  │ https://openrouter.ai/keys  (akses 100+ model)   │
-//  │ OPENAI      │ https://platform.openai.com/api-keys             │
-//  │ MISTRAL     │ https://console.mistral.ai/api-keys              │
-//  │ COHERE      │ https://dashboard.cohere.com/api-keys            │
-//  └─────────────┴──────────────────────────────────────────────────┘
+//  ⚠️  API KEY diisi di index.html (tidak di-push ke GitHub)
+//      Cari bagian: const AI_KEYS = { ... }
 // ════════════════════════════════════════════════════════
 
 const AI_PROVIDERS = [
 
     // ── GOOGLE GEMINI (Gratis, cepat) ──
-    // Daftar: https://aistudio.google.com/app/apikey
     {
         nama:    'Gemini 2.0 Flash',
         enabled: true,
-        keys: [
-            'ISI_GEMINI_KEY_1_DISINI',
-            'ISI_GEMINI_KEY_2_DISINI',
-            'ISI_GEMINI_KEY_3_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.gemini : []; },
         call: async (apiKey, prompt) => {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const res = await fetch(url, {
@@ -50,15 +33,10 @@ const AI_PROVIDERS = [
     },
 
     // ── GROQ (Gratis, sangat cepat — LLaMA & Mixtral) ──
-    // Daftar: https://console.groq.com/keys
     {
         nama:    'Groq LLaMA 3.3',
         enabled: true,
-        keys: [
-            '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',
-            'ISI_GROQ_KEY_2_DISINI',
-            'ISI_GROQ_KEY_3_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.groq : []; },
         call: async (apiKey, prompt) => {
             const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
@@ -83,14 +61,10 @@ const AI_PROVIDERS = [
     },
 
     // ── OPENROUTER (Akses 100+ model, ada tier gratis) ──
-    // Daftar: https://openrouter.ai/keys
     {
         nama:    'OpenRouter',
         enabled: true,
-        keys: [
-            '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',
-            'ISI_OPENROUTER_KEY_2_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.openrouter : []; },
         call: async (apiKey, prompt) => {
             const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
@@ -117,14 +91,10 @@ const AI_PROVIDERS = [
     },
 
     // ── OPENAI (GPT-4o-mini, berbayar tapi murah) ──
-    // Daftar: https://platform.openai.com/api-keys
     {
         nama:    'OpenAI GPT-4o-mini',
         enabled: true,
-        keys: [
-            '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',
-            'ISI_OPENAI_KEY_2_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.openai : []; },
         call: async (apiKey, prompt) => {
             const res = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -149,14 +119,10 @@ const AI_PROVIDERS = [
     },
 
     // ── MISTRAL (Tier gratis tersedia) ──
-    // Daftar: https://console.mistral.ai/api-keys
     {
         nama:    'Mistral Small',
         enabled: true,
-        keys: [
-            'ISI_MISTRAL_KEY_1_DISINI',
-            'ISI_MISTRAL_KEY_2_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.mistral : []; },
         call: async (apiKey, prompt) => {
             const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
                 method: 'POST',
@@ -181,13 +147,10 @@ const AI_PROVIDERS = [
     },
 
     // ── COHERE (Tier gratis tersedia) ──
-    // Daftar: https://dashboard.cohere.com/api-keys
     {
         nama:    'Cohere Command-R',
         enabled: true,
-        keys: [
-            'ISI_COHERE_KEY_1_DISINI',
-        ],
+        get keys() { return (typeof AI_KEYS !== 'undefined') ? AI_KEYS.cohere : []; },
         call: async (apiKey, prompt) => {
             const res = await fetch('https://api.cohere.com/v2/chat', {
                 method: 'POST',
@@ -217,20 +180,32 @@ const AI_PROVIDERS = [
 //  ENGINE: COBA SEMUA KEY & PROVIDER SECARA BERURUTAN
 // ════════════════════════════════════════════════════════
 
+// Cek apakah error adalah rate-limit / quota
+function _isRateLimitError(msg) {
+    return /quota|rate.?limit|429|too many|exceeded|retry/i.test(msg);
+}
+
+// Update teks loading di tombol AI
+function _setAILoadingLabel(txt) {
+    const el = document.getElementById('btnAILabel');
+    if (el) el.textContent = txt;
+}
+
 async function _callAIWithFallback(prompt) {
-    const errors = [];
+    const errors   = [];
+    let   anyKeyTried = false;
 
     for (const provider of AI_PROVIDERS) {
         if (!provider.enabled) continue;
 
         // Filter key yang sudah diisi (bukan placeholder)
-        const validKeys = (provider.keys || []).filter(
-            k => k && k.trim() !== '' && !k.includes('_DISINI')
-        );
+        const validKeys = (provider.keys || []).filter(k => k && k.trim() !== '');
         if (validKeys.length === 0) continue;
 
         for (const key of validKeys) {
+            anyKeyTried = true;
             try {
+                _setAILoadingLabel('Mencoba ' + provider.nama + '...');
                 console.log(`[AI] Mencoba: ${provider.nama}...`);
                 const teks = await provider.call(key, prompt);
                 if (teks && teks.trim()) {
@@ -239,14 +214,23 @@ async function _callAIWithFallback(prompt) {
                 }
                 throw new Error('Respons kosong');
             } catch (e) {
-                const msg = `${provider.nama}: ${e.message}`;
+                const isLimit = _isRateLimitError(e.message);
+                const msg     = `${provider.nama}${isLimit ? ' [quota]' : ''}: ${e.message.substring(0, 80)}`;
                 errors.push(msg);
-                console.warn(`[AI] Gagal (${msg}), mencoba berikutnya...`);
+                console.warn(`[AI] Gagal (${provider.nama}), lanjut berikutnya...`);
+                // Tidak perlu delay — langsung ke key/provider berikutnya
             }
         }
     }
 
-    throw new Error('Semua provider AI gagal. Error: ' + errors.slice(-3).join(' | '));
+    if (!anyKeyTried) {
+        throw new Error(
+            'Tidak ada API Key yang diisi. Buka file ai-rekomendasi.js dan isi minimal 1 key. ' +
+            'Provider gratis: Groq (console.groq.com) · Gemini (aistudio.google.com) · OpenRouter (openrouter.ai)'
+        );
+    }
+
+    throw new Error('Semua provider & key sudah dicoba tapi gagal. Detail: ' + errors.slice(-4).join(' | '));
 }
 
 // ════════════════════════════════════════════════════════
@@ -389,7 +373,7 @@ function isiDiagnosa(targetId, nilai) {
 async function rekomendasiAI() {
     // Cek apakah ada minimal 1 key yang diisi
     const adaKey = AI_PROVIDERS.some(p =>
-        p.enabled && (p.keys || []).some(k => k && k.trim() && !k.includes('_DISINI'))
+        p.enabled && (p.keys || []).some(k => k && k.trim() !== '')
     );
 
     if (!adaKey) {
