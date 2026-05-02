@@ -56,6 +56,8 @@ const themes = [
     { h: 190, name: '#0891b2' }
 ];
 let currentTheme = 0;
+let _themeAutoRotate = true;   // BUG FIX: hentikan rotasi jika user memilih manual
+let _themeRotateTimer = null;
 
 function applyTheme(idx) {
     const t = themes[idx];
@@ -71,37 +73,46 @@ function buildColorSwitcher() {
         dot.className = 'color-dot' + (i === 0 ? ' active' : '');
         dot.style.background = t.name;
         dot.title = 'Tema ' + (i + 1);
-        dot.onclick = () => { currentTheme = i; applyTheme(i); };
+        dot.onclick = () => {
+            currentTheme = i;
+            _themeAutoRotate = false;   // BUG FIX: matikan auto-rotate setelah pilihan manual
+            applyTheme(i);
+        };
         sw.appendChild(dot);
     });
     return sw;
 }
 
-// Auto-rotate tema setiap 8 detik
-setInterval(() => {
+// Auto-rotate tema setiap 8 detik — berhenti jika user pilih manual
+_themeRotateTimer = setInterval(() => {
+    if (!_themeAutoRotate) return;
     currentTheme = (currentTheme + 1) % themes.length;
     applyTheme(currentTheme);
 }, 8000);
 
 // ── KALKULASI IMT ──
 function calculateIMT() {
-    const bb = parseFloat($('bb').value);
-    const tb = parseFloat($('tb').value) / 100;
+    const bbEl = $('bb'); const tbEl = $('tb'); const imtEl = $('imtCalc');
+    if (!bbEl || !tbEl || !imtEl) return;
+    const bb = parseFloat(bbEl.value);
+    const tb = parseFloat(tbEl.value) / 100;
     if (bb && tb && tb > 0) {
         const imt = (bb / (tb * tb)).toFixed(1);
         let kat = imt < 18.5 ? "Underweight" : imt < 25 ? "Normal" : imt < 30 ? "Overweight" : "Obesitas";
-        $('imtCalc').innerText = `IMT: ${imt} (${kat})`;
+        imtEl.innerText = `IMT: ${imt} (${kat})`;
     } else {
-        $('imtCalc').innerText = "";
+        imtEl.innerText = "";
     }
 }
 
 // ── CEK TENSI TINGGI ──
 function checkTensi() {
-    const s = parseInt($('sistol').value);
-    const d = parseInt($('diastol').value);
-    if (s >= 140) $('sistol').classList.add('is-high'); else $('sistol').classList.remove('is-high');
-    if (d >= 90)  $('diastol').classList.add('is-high'); else $('diastol').classList.remove('is-high');
+    const sEl = $('sistol'); const dEl = $('diastol');
+    if (!sEl || !dEl) return;
+    const s = parseInt(sEl.value);
+    const d = parseInt(dEl.value);
+    if (s >= 140) sEl.classList.add('is-high'); else sEl.classList.remove('is-high');
+    if (d >= 90)  dEl.classList.add('is-high'); else dEl.classList.remove('is-high');
 }
 
 // ── AUTO-SAVE & CLEAR SESSION ──

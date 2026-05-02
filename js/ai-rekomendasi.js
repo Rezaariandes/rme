@@ -334,10 +334,11 @@ function _tampilkanHasil(hasil, providerNama) {
     if (hasil.diagnosa.length === 0) {
         notifTxt.innerHTML = `<span style="color:#ef4444;">⚠️ Data klinis belum cukup untuk analisa. Lengkapi keluhan & pemeriksaan fisik.</span>`;
     } else {
+        // BUG FIX: Gunakan data-attribute dan event delegation, bukan inline onclick string
+        // untuk menghindari potensi XSS jika teks diagnosa mengandung karakter khusus
         const chips = hasil.diagnosa.map((d, i) => {
             const target = i === 0 ? 'diagnosa' : 'diagnosa2';
-            const safeD  = d.replace(/'/g, "\\'");
-            return `<span class="ai-chip" onclick="isiDiagnosa('${target}','${safeD}')" title="Klik untuk mengisi kolom diagnosa">${d}</span>`;
+            return `<span class="ai-chip" data-target="${target}" data-nilai="${d.replace(/"/g, '&quot;')}" title="Klik untuk mengisi kolom diagnosa">${d}</span>`;
         }).join('');
 
         notifTxt.innerHTML =
@@ -353,6 +354,13 @@ function _tampilkanHasil(hasil, providerNama) {
     notif.style.display = 'flex';
     notif.style.animation = 'none';
     setTimeout(() => { notif.style.animation = 'aiSlideIn .3s ease'; }, 10);
+
+    // BUG FIX: Pasang event delegation untuk chip diagnosa (mengganti inline onclick)
+    notifTxt.querySelectorAll('.ai-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            isiDiagnosa(chip.dataset.target, chip.dataset.nilai);
+        });
+    });
 }
 
 function isiDiagnosa(targetId, nilai) {

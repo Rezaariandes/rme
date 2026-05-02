@@ -32,8 +32,11 @@ async function autoFillPasien() {
             body: JSON.stringify({ action: "checkAndUpsertPasien", nama: p.nama, nik: p.nik })
         });
         const data = await res.json();
-        currentPasienId = data.pasien.id;
-        currentRiwayat  = data.riwayat || [];
+        // BUG FIX: Guard — data.pasien bisa null jika server error
+        if (data && data.pasien && data.pasien.id) {
+            currentPasienId = data.pasien.id;
+        }
+        currentRiwayat  = (data && data.riwayat) ? data.riwayat : [];
         renderRiwayatList(currentRiwayat, 'riwayatDaftarContainer');
     } catch (e) {
         if (riwayatEl) riwayatEl.innerHTML = '';
@@ -146,7 +149,10 @@ async function lanjutPemeriksaan() {
             calculateIMT(); checkTensi();
             showToast("ℹ️ Melanjutkan data pemeriksaan hari ini", "info");
         } else {
-            currentKunjunganId = currentRiwayat.length > 0 ? currentRiwayat[0].id : null;
+            // BUG FIX: Jika tidak ada kunjungan hari ini, ID harus null (akan dibuat baru saat saveAll).
+            // Sebelumnya di-set ke currentRiwayat[0].id yang merupakan kunjungan LAMA
+            // sehingga menyebabkan overwrite rekam medis kunjungan sebelumnya.
+            currentKunjunganId = null;
             showToast("✅ Siap periksa: " + namaPasien, "success");
         }
 

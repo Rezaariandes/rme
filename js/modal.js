@@ -45,21 +45,17 @@ function openModal(index) {
 
     toggleEditModal(false);
 
-    // Sembunyikan baris diagnosa untuk Perawat
+    // BUG FIX: Sembunyikan bagian diagnosa untuk Paramedis dengan cara yang lebih aman
     const isPerawat = window._isParamedis === true;
-    ['viewDiag', 'modalDiag1', 'modalDiag2'].forEach(id => {
-        const el = $(id);
-        if (el) el.closest('.col-6, .form-group, div') && (el.parentElement.style.display = isPerawat ? 'none' : '');
-    });
-    // Sembunyikan label & wrapper row diagnosa di mode view
-    const viewDiagEl = $('viewDiag');
-    if (viewDiagEl) {
-        const wrapper = viewDiagEl.closest('[class]') || viewDiagEl.parentElement;
-        if (wrapper) wrapper.style.display = isPerawat ? 'none' : '';
-    }
-    // Sembunyikan row diagnosa di mode edit
-    const diagRow = $('modalDiag1') ? $('modalDiag1').closest('.row') : null;
-    if (diagRow) diagRow.style.display = isPerawat ? 'none' : '';
+
+    // Mode View — sembunyikan row diagnosa
+    const viewDiagRow = $('viewDiag') ? $('viewDiag').closest('.detail-row') : null;
+    if (viewDiagRow) viewDiagRow.style.display = isPerawat ? 'none' : '';
+
+    // Mode Edit — sembunyikan row diagnosa
+    const diagEditRow = $('modalDiag1') ? $('modalDiag1').closest('.row') : null;
+    if (diagEditRow) diagEditRow.style.display = isPerawat ? 'none' : '';
+
     const modal = $('modalRiwayat');
     if (modal) modal.classList.add('show');
 }

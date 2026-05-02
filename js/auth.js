@@ -225,9 +225,7 @@ function canAccessMedis() {
     return true;
 }
 
-// ── AUTO-INIT ──
-if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", initPinLock);
-} else {
-    initPinLock();
-}
+// ── AUTO-INIT: dipanggil dari initApp() di app.js setelah semua fragment HTML ter-inject ──
+// BUG FIX: Sebelumnya menggunakan DOMContentLoaded yang sudah terlambat (DOM sudah ready
+// saat skrip diinjeksikan dinamis), namun elemen PIN belum tentu ada di DOM jika fragment
+// HTML belum di-inject. initPinLock() sekarang dipanggil eksplisit dari initApp().

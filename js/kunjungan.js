@@ -203,6 +203,13 @@ async function saveAll() {
                 currentKunjunganId = result.kunjunganId;
             }
 
+            // BUG FIX: Update status di array lokal secara optimistis
+            // agar tampilan Kunjungan Hari Ini langsung berubah tanpa menunggu refetch
+            if (isSelesai && currentKunjunganId) {
+                const idx = kunjunganHariIni.findIndex(x => x.id === currentKunjunganId);
+                if (idx !== -1) kunjunganHariIni[idx].status = 'Selesai';
+            }
+
             if (isSelesai) {
                 showToast("✅ Rekam medis selesai & tersimpan!", "success");
                 if (btn) btn.innerText = "✓ Tersimpan!";

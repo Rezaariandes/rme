@@ -21,6 +21,10 @@ function switchPage(id, navEl) {
 
 // ── INISIALISASI APLIKASI ──
 async function initApp() {
+    // BUG FIX: initPinLock dipanggil di sini (setelah HTML fragment ter-inject),
+    // bukan dari auto-init di auth.js yang bisa race-condition.
+    if (typeof initPinLock === 'function') initPinLock();
+
     // Gunakan $ dari utils.js (tidak perlu deklarasi ulang)
     const today        = new Date();
     const tzOffset     = today.getTimezoneOffset() * 60000;
@@ -58,10 +62,15 @@ async function initApp() {
     });
 
     // TTV bindings (menggunakan $ dari utils.js)
-    if ($('bb'))      $('bb').addEventListener('input', calculateIMT);
-    if ($('tb'))      $('tb').addEventListener('input', calculateIMT);
-    if ($('sistol'))  $('sistol').addEventListener('input', checkTensi);
-    if ($('diastol')) $('diastol').addEventListener('input', checkTensi);
+    // BUG FIX: guard tambahan — addEventListener hanya jika elemen ada
+    const bbEl      = $('bb');
+    const tbEl      = $('tb');
+    const sistolEl  = $('sistol');
+    const diastolEl = $('diastol');
+    if (bbEl)      bbEl.addEventListener('input', calculateIMT);
+    if (tbEl)      tbEl.addEventListener('input', calculateIMT);
+    if (sistolEl)  sistolEl.addEventListener('input', checkTensi);
+    if (diastolEl) diastolEl.addEventListener('input', checkTensi);
 
     // Pulihkan sesi pageMedis jika ada
     if (localStorage.getItem('activePage') === 'pageMedis') {

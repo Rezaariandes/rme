@@ -114,9 +114,6 @@ async function updatePinUser() {
     }
 }
 
-// ── AUTO-INIT ──
-if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", fetchUsers);
-} else {
-    fetchUsers();
-}
+// ── AUTO-INIT: dipanggil dari initApp() setelah fragment HTML ter-inject ──
+// BUG FIX: auto-init dihapus; fetchUsers() dipanggil dari switchPage/initApp
+// sehingga elemen #listUserContainer sudah pasti ada di DOM.
