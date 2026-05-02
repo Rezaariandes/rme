@@ -57,16 +57,20 @@ async function loadRuntimeSettings() {
         if (h1   && s.klinik_title) h1.innerText   = s.klinik_title;
         if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
 
-        // Update AI Keys
-        const providers = ['gemini','groq','openrouter','openai','mistral'];
+        // Update AI Keys — hanya overwrite jika array tidak kosong
+        const providers = ['gemini','groq','openrouter','openai','mistral','cohere'];
         providers.forEach(p => {
-            if (s[`ai_${p}`]) {
+            const raw = s[`ai_${p}`];
+            if (raw && typeof raw === 'string' && raw.trim() !== '' && raw.trim() !== '[]') {
                 try {
-                    const keys = JSON.parse(s[`ai_${p}`]);
-                    if (Array.isArray(keys) && typeof AI_KEYS !== 'undefined') {
+                    const keys = JSON.parse(raw);
+                    if (Array.isArray(keys) && keys.length > 0 && typeof AI_KEYS !== 'undefined') {
                         AI_KEYS[p] = keys;
+                        console.log('[Klikpro] AI key loaded: ' + p + ' (' + keys.length + ' key)');
                     }
-                } catch(e) {}
+                } catch(e) {
+                    console.warn('[Klikpro] Gagal parse AI key ' + p + ':', e.message);
+                }
             }
         });
 
@@ -154,7 +158,11 @@ async function initApp() {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // Ambil data awal dari server
+    // Ambil data awal & settings secara PARALEL agar AI Keys siap lebih cepat
+    // BUG FIX: loadRuntimeSettings dijalankan bersamaan dengan initData (tidak serial)
+    // sehingga AI_KEYS sudah terisi sebelum user sempat klik tombol Rekomendasi AI
+    const settingsPromise = loadRuntimeSettings();
+
     try {
         const res  = await fetch(APP_URL, {
             method: 'POST',
@@ -177,8 +185,8 @@ async function initApp() {
 
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
 
-        // Muat konfigurasi runtime setelah data awal siap
-        await loadRuntimeSettings();
+        // Tunggu settings selesai juga (sudah berjalan paralel sejak awal)
+        await settingsPromise;
 
     } catch (e) {
         showToast("⚡ Gagal terhubung ke server. Cek koneksi.", "error");
