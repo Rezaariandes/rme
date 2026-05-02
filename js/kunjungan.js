@@ -99,7 +99,7 @@ async function bukaRekamMedisHariIni(kId) {
     // Isi form TTV
     _isiFormDariKunjungan(h);
     document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.setItem('rme_' + el.id, el.value));
-    calculateIMT(); checkTensi();
+    calculateIMT(); checkTensi(); checkLabAlert();
 
     localStorage.setItem('activePage', 'pageMedis');
     localStorage.setItem('cP_id',     currentPasienId);
@@ -152,7 +152,7 @@ async function saveAll() {
     const d1     = $('diagnosa')  ? $('diagnosa').value.trim()  : '';
     const d2     = $('diagnosa2') ? $('diagnosa2').value.trim() : '';
     const terapi = $('terapi')    ? $('terapi').value.trim()    : '';
-    const hasData = ['sistol','diastol','nadi','suhu','rr','bb','tb'].some(id => $(id) && $(id).value !== "");
+    const hasData = ['sistol','diastol','nadi','suhu','rr','bb','tb','lab_gds','lab_chol','lab_ua'].some(id => $(id) && $(id).value !== "");
 
     if (!d1 && !hasData) return showToast("⚠️ Isi Diagnosa Utama atau Tanda Vital!", "error");
 
@@ -187,6 +187,9 @@ async function saveAll() {
         suhu:     $('suhu')     ? $('suhu').value     : '',
         bb:       $('bb')       ? $('bb').value       : '',
         tb:       $('tb')       ? $('tb').value       : '',
+        lab_gds:  $('lab_gds')  ? $('lab_gds').value  : '',
+        lab_chol: $('lab_chol') ? $('lab_chol').value : '',
+        lab_ua:   $('lab_ua')   ? $('lab_ua').value   : '',
         keluhan:  $('keluhan')  ? $('keluhan').value  : '',
         fisik:    $('fisik')    ? $('fisik').value    : '',
         diagnosa: diagGabung,
@@ -256,6 +259,7 @@ function renderRiwayatList(riwayatArr, containerId) {
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
                         <b>TTV:</b> TD ${r.td||'-'} | N ${r.nadi||'-'} | S ${r.suhu||'-'} | RR ${r.rr||'-'} | BB ${r.bb||'-'}
                     </div>
+                    ${(r.lab_gds||r.lab_chol||r.lab_ua) ? `<div style="font-size:11px;margin-bottom:6px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:4px 8px;border-radius:8px;"><b>🔬 Lab:</b> GDS ${r.lab_gds||'-'} | Chol ${r.lab_chol||'-'} | AU ${r.lab_ua||'-'}</div>` : ''}
                     ${window._isParamedis ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
                     <div class="riwayat-keluhan" style="color:var(--text); border-top:1px dashed var(--border); padding-top:4px; margin-bottom:3px;"><b>Keluhan:</b> ${r.keluhan || '-'}</div>
                     <div class="riwayat-keluhan" style="color:var(--text);"><b>Terapi:</b> ${r.terapi || '-'}</div>

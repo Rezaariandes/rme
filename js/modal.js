@@ -17,6 +17,15 @@ function openModal(index) {
     if ($('viewFisik'))   $('viewFisik').innerText   = r.fisik   || '-';
     if ($('viewTtv'))     $('viewTtv').innerHTML     =
         `TD: ${r.td||'-'} | N: ${r.nadi||'-'} | S: ${r.suhu||'-'} <br> RR: ${r.rr||'-'} | BB: ${r.bb||'-'} | TB: ${r.tb||'-'}`;
+
+    // Lab view
+    const labRow = $('viewLabRow');
+    const hasLab = r.lab_gds || r.lab_chol || r.lab_ua;
+    if (labRow) labRow.style.display = hasLab ? '' : 'none';
+    if ($('viewLab')) $('viewLab').innerHTML = hasLab
+        ? `GDS: ${r.lab_gds||'-'} mg/dL &nbsp;|&nbsp; Kolesterol: ${r.lab_chol||'-'} mg/dL &nbsp;|&nbsp; Asam Urat: ${r.lab_ua||'-'} mg/dL`
+        : '-';
+
     if ($('viewDiag'))    $('viewDiag').innerText    = r.diag   || '-';
     if ($('viewTerapi'))  $('viewTerapi').innerText  = r.terapi || '-';
 
@@ -32,6 +41,9 @@ function openModal(index) {
     if ($('modalRr'))      $('modalRr').value      = r.rr      || '';
     if ($('modalBb'))      $('modalBb').value      = r.bb      || '';
     if ($('modalTb'))      $('modalTb').value      = r.tb      || '';
+    if ($('modalLabGds'))  $('modalLabGds').value  = r.lab_gds  || '';
+    if ($('modalLabChol')) $('modalLabChol').value = r.lab_chol || '';
+    if ($('modalLabUa'))   $('modalLabUa').value   = r.lab_ua   || '';
 
     const diagLama = String(r.diag || '');
     if (diagLama.includes(" | ")) {
@@ -101,6 +113,9 @@ async function simpanEditModal() {
         rr:       $('modalRr')      ? $('modalRr').value      : '',
         bb:       $('modalBb')      ? $('modalBb').value      : '',
         tb:       $('modalTb')      ? $('modalTb').value      : '',
+        lab_gds:  $('modalLabGds')  ? $('modalLabGds').value  : '',
+        lab_chol: $('modalLabChol') ? $('modalLabChol').value : '',
+        lab_ua:   $('modalLabUa')   ? $('modalLabUa').value   : '',
         diagnosa: diagGabung,
         terapi:   $('modalTerapi')  ? $('modalTerapi').value  : ''
     };
@@ -111,11 +126,13 @@ async function simpanEditModal() {
 
         // Update data lokal tanpa fetch ulang
         Object.assign(r, {
-            keluhan: payload.keluhan, fisik:   payload.fisik,
-            td:      payload.td,      nadi:    payload.nadi,
-            suhu:    payload.suhu,    rr:      payload.rr,
-            bb:      payload.bb,      tb:      payload.tb,
-            diag:    payload.diagnosa, terapi: payload.terapi
+            keluhan: payload.keluhan, fisik:     payload.fisik,
+            td:      payload.td,      nadi:      payload.nadi,
+            suhu:    payload.suhu,    rr:        payload.rr,
+            bb:      payload.bb,      tb:        payload.tb,
+            lab_gds: payload.lab_gds, lab_chol:  payload.lab_chol,
+            lab_ua:  payload.lab_ua,
+            diag:    payload.diagnosa, terapi:   payload.terapi
         });
 
         renderRiwayatList(currentRiwayat, 'historyListMedis');

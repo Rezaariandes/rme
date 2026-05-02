@@ -180,6 +180,9 @@ function _isiFormDariKunjungan(h) {
     if ($('rr'))      $('rr').value      = h.rr      || '';
     if ($('bb'))      $('bb').value      = h.bb      || '';
     if ($('tb'))      $('tb').value      = h.tb      || '';
+    if ($('lab_gds'))  $('lab_gds').value  = h.lab_gds  || '';
+    if ($('lab_chol')) $('lab_chol').value = h.lab_chol || '';
+    if ($('lab_ua'))   $('lab_ua').value   = h.lab_ua   || '';
     if ($('keluhan')) $('keluhan').value = h.keluhan || '';
     if ($('fisik'))   $('fisik').value   = h.fisik   || '';
 

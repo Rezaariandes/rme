@@ -72,6 +72,12 @@ async function initApp() {
     if (sistolEl)  sistolEl.addEventListener('input', checkTensi);
     if (diastolEl) diastolEl.addEventListener('input', checkTensi);
 
+    // Lab alert bindings
+    ['lab_gds','lab_chol','lab_ua'].forEach(id => {
+        const el = $(id);
+        if (el) el.addEventListener('input', checkLabAlert);
+    });
+
     // Pulihkan sesi pageMedis jika ada
     if (localStorage.getItem('activePage') === 'pageMedis') {
         currentPasienId    = localStorage.getItem('cP_id');
@@ -98,6 +104,7 @@ async function initApp() {
         // Hitung IMT & cek tensi setelah autosave dimuat
         calculateIMT();
         checkTensi();
+        checkLabAlert();
 
         switchPage('pageMedis', null);
     } else {
