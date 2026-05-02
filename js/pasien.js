@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════
 //  KLIKPRO RME — MODUL PASIEN
 //  Pendaftaran, pencarian, auto-fill, scan KTP
+//  OCR: Claude Vision API (menggantikan Tesseract)
 // ════════════════════════════════════════════════════════
 
 let allPatients     = [];
@@ -119,10 +120,10 @@ async function lanjutPemeriksaan() {
             createVisitToday: true,
             localDate: localDateStr, localTime: localTimeStr,
             nama: namaPasien,
-            nik:      $('nik')      ? $('nik').value      : '',
+            nik:       $('nik')       ? $('nik').value       : '',
             tgl_lahir: $('tgl_lahir') ? $('tgl_lahir').value : '',
-            jk:       $('jk')       ? $('jk').value       : 'L',
-            alamat:   $('alamat')   ? $('alamat').value   : ''
+            jk:        $('jk')        ? $('jk').value        : 'L',
+            alamat:    $('alamat')    ? $('alamat').value     : ''
         };
         const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -132,7 +133,7 @@ async function lanjutPemeriksaan() {
         currentPasienId = data.pasien.id;
         currentRiwayat  = data.riwayat || [];
 
-        const tglIndoNorm = `${parseInt(parts[2])}/${parseInt(parts[1])}/${parts[0]}`;
+        const tglIndoNorm  = `${parseInt(parts[2])}/${parseInt(parts[1])}/${parts[0]}`;
         const visitHariIni = currentRiwayat.find(r => {
             const t = String(r.tgl || '').trim();
             return t === tglIndoFull || t === tglIndoNorm || t === localDateStr;
@@ -150,9 +151,9 @@ async function lanjutPemeriksaan() {
         }
 
         renderRiwayatList(currentRiwayat, 'historyListMedis');
-        localStorage.setItem('cP_id',       currentPasienId);
-        localStorage.setItem('cK_id',       currentKunjunganId);
-        localStorage.setItem('cP_riwayat',  JSON.stringify(currentRiwayat));
+        localStorage.setItem('cP_id',      currentPasienId);
+        localStorage.setItem('cK_id',      currentKunjunganId);
+        localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
 
     } catch (e) {
         showToast("⚠️ Data belum sinkron: " + (e.message || 'Cek koneksi'), "warning");
@@ -202,198 +203,149 @@ function resetSession() {
     fetchByDate();
 }
 
+
 // ════════════════════════════════════════════════════════
-//  SCAN KTP — PERBAIKAN LENGKAP
-//  Masalah sebelumnya:
-//  1. Regex NIK \b\d{16}\b gagal jika ada spasi antar digit
-//  2. Parser nama tidak menangani variasi format KTP daerah
-//  3. Tidak ada preprocessing gambar (kontras, grayscale)
-//  4. Tidak ada fallback strategi pencarian
+//  SCAN KTP — Claude Vision API
+//
+//  Menggantikan Tesseract.js yang tidak reliable.
+//  Claude Vision memahami konteks KTP Indonesia secara
+//  semantik, bukan hanya pattern matching karakter.
+//
+//  Cara kerja:
+//  1. Foto KTP dikonversi ke base64
+//  2. Dikirim ke Anthropic /v1/messages dengan instruksi
+//     ekstrak NIK, Nama, Tgl Lahir, JK, Alamat
+//  3. Response JSON di-parse dan langsung isi form
+//
+//  Biaya: ~0.001 USD per scan (sangat murah)
+//  Akurasi: Sangat tinggi, mengerti konteks Indonesia
 // ════════════════════════════════════════════════════════
 
-// ── PREPROCESSING: Tingkatkan kontras & sharpness gambar ──
-function preprocessKtpImage(file) {
+// ── Konversi File/Blob ke base64 string ──
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => {
+            // result: "data:image/jpeg;base64,XXXX..." → ambil setelah koma
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
+        reader.readAsDataURL(file);
+    });
+}
+
+// ── Resize gambar jika terlalu besar (hemat token API) ──
+function resizeImageForAPI(file, maxWidth = 1200) {
     return new Promise((resolve) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            // Perbesar gambar 2x agar OCR lebih akurat
-            const scale  = Math.min(2, 2000 / Math.max(img.width, img.height));
-            canvas.width  = img.width  * scale;
-            canvas.height = img.height * scale;
-            const ctx = canvas.getContext('2d');
 
-            // Gambar asli
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+        img.onload  = () => {
+            URL.revokeObjectURL(url);
+
+            // Jika sudah kecil, tidak perlu resize
+            if (img.width <= maxWidth) { resolve(file); return; }
+
+            const ratio  = maxWidth / img.width;
+            const canvas = document.createElement('canvas');
+            canvas.width  = maxWidth;
+            canvas.height = Math.round(img.height * ratio);
+
+            const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-            // Ambil pixel data
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data      = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                // Konversi ke grayscale (luminance weighted)
-                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-
-                // Tingkatkan kontras (faktor 1.8)
-                const contrast = 1.8;
-                const factor   = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-                const val      = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
-
-                data[i]     = val; // R
-                data[i + 1] = val; // G
-                data[i + 2] = val; // B
-                // Alpha tidak diubah
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            URL.revokeObjectURL(url);
-            canvas.toBlob(resolve, 'image/png');
+            canvas.toBlob(
+                blob => resolve(blob || file),
+                file.type || 'image/jpeg',
+                0.92  // kualitas 92%
+            );
         };
-        img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
         img.src = url;
     });
 }
 
-// ── EKSTRAK NIK: Cari 16 digit berurutan (toleran spasi & OCR noise) ──
-function extractNIK(text) {
-    // Strategi 1: 16 digit mepet (paling ideal)
-    let m = text.match(/\b(\d{16})\b/);
-    if (m) return m[1];
-
-    // Strategi 2: Baris yang mengandung kata NIK / nomor, ambil semua digit
-    const lines = text.split('\n');
-    for (const line of lines) {
-        const upper = line.toUpperCase();
-        if (upper.includes('NIK') || upper.includes('NO.') || upper.includes('NOMOR')) {
-            const digits = line.replace(/\D/g, '');
-            if (digits.length === 16) return digits;
-            // Toleransi: 15–17 digit (OCR kadang salah baca 1 digit)
-            if (digits.length >= 15 && digits.length <= 17) return digits.substring(0, 16);
-        }
-    }
-
-    // Strategi 3: Cari sekuens digit 16 karakter di seluruh teks (termasuk ada spasi)
-    const allDigits = text.replace(/[^\d\s]/g, '');
-    const sequences = allDigits.match(/\d[\d\s]{14,18}\d/g) || [];
-    for (const seq of sequences) {
-        const digits = seq.replace(/\s/g, '');
-        if (digits.length === 16) return digits;
-    }
-
-    return null;
+// ── Deteksi media type dari file ──
+function getMediaType(file) {
+    const type = file.type || '';
+    if (type.includes('png'))  return 'image/png';
+    if (type.includes('webp')) return 'image/webp';
+    if (type.includes('gif'))  return 'image/gif';
+    return 'image/jpeg'; // default
 }
 
-// ── EKSTRAK NAMA: Multi-strategi parsing KTP Indonesia ──
-function extractNama(text) {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+// ── Kirim gambar ke Claude Vision, dapatkan data KTP ──
+async function scanKtpDenganClaude(file) {
+    // 1. Resize gambar agar tidak melebihi batas token
+    const resized  = await resizeImageForAPI(file, 1200);
+    const base64   = await fileToBase64(resized);
+    const mimeType = getMediaType(file);
 
-    // ── Keyword label yang ada di KTP ──
-    const labelNama  = /^(NAMA\s*[:.]?|Nama\s*[:.]?)/i;
-    const skipWords  = /^(NIK|PROVINSI|KABUPATEN|KOTA|KECAMATAN|KELURAHAN|DESA|DUSUN|RT|RW|ALAMAT|TEMPAT|TGL|JENIS|GOL|STATUS|PEKERJAAN|KEWARGANEGARAAN|BERLAKU|AGAMA|DARAH|LAHIR|SCAN|KTP|INDONESIA)/i;
-    const validNama  = /^[A-Z][A-Za-z .'\-]{2,50}$/;  // nama valid: huruf, spasi, titik, strip
+    // 2. Prompt yang sangat spesifik untuk KTP Indonesia
+    const prompt = `Ini adalah foto KTP (Kartu Tanda Penduduk) Indonesia.
 
-    // Strategi 1: Baris yang DIAWALI kata "NAMA"
-    for (let i = 0; i < lines.length; i++) {
-        if (labelNama.test(lines[i])) {
-            // Nama bisa di baris yang sama setelah label
-            let nama = lines[i].replace(labelNama, '').replace(/^[\s:.]+/, '').trim();
-            // Bersihkan karakter aneh di awal/akhir
-            nama = nama.replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z\s.']+$/, '').trim();
-            if (nama.length >= 3 && validNama.test(nama)) return toTitleCase(nama);
+Ekstrak data berikut secara AKURAT dan kembalikan HANYA dalam format JSON valid, tanpa teks lain apapun:
 
-            // Nama ada di baris berikutnya
-            if (i + 1 < lines.length) {
-                let namaNext = lines[i + 1].replace(/^[\s:.]+/, '').trim();
-                namaNext = namaNext.replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z\s.']+$/, '').trim();
-                if (namaNext.length >= 3 && !skipWords.test(namaNext)) return toTitleCase(namaNext);
-            }
-        }
-    }
+{
+  "nik": "16 digit angka NIK, atau null jika tidak terbaca",
+  "nama": "Nama lengkap sesuai KTP dalam format Title Case, atau null",
+  "tgl_lahir": "Tanggal lahir format DD/MM/YYYY, atau null",
+  "jk": "L untuk Laki-laki, P untuk Perempuan, atau null",
+  "alamat": "Alamat lengkap satu baris, atau null"
+}
 
-    // Strategi 2: Cari baris ALL CAPS tanpa digit yang bukan keyword KTP
-    //             (nama di KTP biasanya kapital semua)
-    const capsLines = lines.filter(l => {
-        const onlyCaps = /^[A-Z][A-Z\s.']{2,50}$/.test(l);
-        const notKw    = !skipWords.test(l);
-        const noDigit  = !/\d/.test(l);
-        return onlyCaps && notKw && noDigit;
+ATURAN PENTING:
+- NIK selalu 16 digit angka, biasanya di bagian atas KTP
+- Nama ditulis KAPITAL di KTP, konversi ke Title Case (contoh: BUDI SANTOSO → Budi Santoso)
+- Jika ada field yang tidak terbaca jelas, isi dengan null (bukan string kosong)
+- Kembalikan HANYA JSON, tidak ada penjelasan atau teks lain`;
+
+    // 3. Panggil Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type':         'application/json',
+            'anthropic-version':    '2023-06-01',
+            'anthropic-dangerous-direct-browser-calls': 'true'
+        },
+        body: JSON.stringify({
+            model:      'claude-haiku-4-5-20251001', // Haiku: cepat & murah, cukup untuk OCR
+            max_tokens: 300,
+            messages: [{
+                role: 'user',
+                content: [
+                    {
+                        type:   'image',
+                        source: {
+                            type:       'base64',
+                            media_type: mimeType,
+                            data:       base64
+                        }
+                    },
+                    {
+                        type: 'text',
+                        text: prompt
+                    }
+                ]
+            }]
+        })
     });
 
-    // Pilih baris ALL CAPS paling panjang (kemungkinan nama)
-    if (capsLines.length > 0) {
-        const best = capsLines.reduce((a, b) => a.length >= b.length ? a : b);
-        return toTitleCase(best.trim());
+    if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error('API error ' + response.status + ': ' + errBody);
     }
 
-    // Strategi 3: Fallback — baris setelah NIK yang terlihat seperti nama
-    for (let i = 0; i < lines.length; i++) {
-        if (/\d{16}/.test(lines[i].replace(/\s/g, ''))) {
-            // Cek 1–3 baris setelah NIK
-            for (let j = i + 1; j <= i + 3 && j < lines.length; j++) {
-                let candidate = lines[j].replace(/^[^A-Za-z]+/, '').trim();
-                if (candidate.length >= 3 && !skipWords.test(candidate) && !/\d{4}/.test(candidate)) {
-                    return toTitleCase(candidate);
-                }
-            }
-        }
-    }
+    const data    = await response.json();
+    const rawText = data.content?.[0]?.text || '';
 
-    return null;
-}
+    // 4. Parse JSON dari response
+    // Claude kadang wrap JSON dalam ```json ... ``` — bersihkan dulu
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Respons tidak mengandung JSON valid');
 
-// ── TITLE CASE helper ──
-function toTitleCase(str) {
-    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-}
-
-// ── EKSTRAK TANGGAL LAHIR dari teks OCR ──
-function extractTglLahir(text) {
-    // Format: DD-MM-YYYY atau DD/MM/YYYY atau DD MM YYYY
-    const patterns = [
-        /(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/,  // DD-MM-YYYY
-        /LAHIR\s*[:.]?\s*(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/i,
-        /TGL\.?\s*LAHIR\s*[:.]?\s*(\d{2})[-\/\s](\d{2})[-\/\s](\d{4})/i,
-    ];
-    for (const pat of patterns) {
-        const m = text.match(pat);
-        if (m) {
-            // Validasi: bulan 01-12, hari 01-31
-            const d = parseInt(m[m.length - 3]);
-            const mo = parseInt(m[m.length - 2]);
-            const y  = parseInt(m[m.length - 1]);
-            if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 1900 && y <= new Date().getFullYear()) {
-                return String(d).padStart(2,'0') + '/' + String(mo).padStart(2,'0') + '/' + y;
-            }
-        }
-    }
-    return null;
-}
-
-// ── EKSTRAK JENIS KELAMIN ──
-function extractJK(text) {
-    const upper = text.toUpperCase();
-    if (upper.includes('PEREMPUAN') || upper.includes('P ') || upper.includes(' P\n')) return 'P';
-    if (upper.includes('LAKI-LAKI') || upper.includes('LAKI LAKI')) return 'L';
-    return null;
-}
-
-// ── EKSTRAK ALAMAT ──
-function extractAlamat(text) {
-    const lines = text.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-        const upper = lines[i].toUpperCase();
-        if (upper.includes('ALAMAT')) {
-            let alamat = lines[i].replace(/ALAMAT\s*[:.]?/i, '').trim();
-            // Ambil 1-2 baris berikutnya jika masih bagian alamat
-            if (i + 1 < lines.length && !/^(RT|RW|KEL|KEC|KAB|KOTA|PROV|AGAMA|GOL|STATUS|PEKERJAAN)/i.test(lines[i+1])) {
-                alamat += ' ' + lines[i+1].trim();
-            }
-            alamat = alamat.replace(/^[^A-Za-z0-9]+/, '').trim();
-            if (alamat.length >= 3) return alamat;
-        }
-    }
-    return null;
+    return JSON.parse(jsonMatch[0]);
 }
 
 // ── INISIALISASI SCAN KTP (UTAMA) ──
@@ -401,82 +353,90 @@ function initScanKtp() {
     const camInput = $('camInput');
     if (!camInput) return;
 
-    camInput.addEventListener('change', async function (e) {
+    camInput.addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (!file) return;
 
-        showToast("⏳ Memproses gambar KTP...", "info");
+        // Validasi tipe file
+        if (!file.type.startsWith('image/')) {
+            showToast("❌ File harus berupa gambar (JPG/PNG)", "error");
+            camInput.value = '';
+            return;
+        }
+
+        // Tampilkan loading state di tombol scan
+        const scanBox   = document.querySelector('.scan-ktp');
+        const scanLabel = document.querySelector('.scan-ktp-label');
+        const scanIcon  = document.querySelector('.scan-ktp-icon');
+        if (scanLabel) scanLabel.textContent = 'Membaca KTP...';
+        if (scanIcon)  scanIcon.textContent  = '⏳';
+        if (scanBox)   scanBox.style.opacity = '0.7';
+
+        showToast("🔍 Membaca KTP dengan AI...", "info");
 
         try {
-            // 1. Preprocessing: tingkatkan kualitas gambar
-            const processedBlob = await preprocessKtpImage(file);
+            // Kirim ke Claude Vision
+            const ktpData = await scanKtpDenganClaude(file);
 
-            showToast("🔍 Membaca teks KTP...", "info");
+            const filled = [];
 
-            // 2. OCR dengan konfigurasi optimal untuk KTP
-            const result = await Tesseract.recognize(processedBlob, 'ind', {
-                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-/.() ',
-                preserve_interword_spaces: '1',
-            });
-
-            const text = result.data.text;
-            console.log('[KTP OCR Raw]', text); // Untuk debugging
-
-            let foundNIK  = false;
-            let foundNama = false;
-            let summary   = [];
-
-            // 3. Ekstrak NIK
-            const nik = extractNIK(text);
-            if (nik && $('nik')) {
-                $('nik').value = nik;
-                foundNIK = true;
-                summary.push('NIK ✓');
+            // Isi form dari data yang diekstrak
+            if (ktpData.nik && $('nik')) {
+                // Pastikan hanya angka, max 16 digit
+                const nikClean = String(ktpData.nik).replace(/\D/g, '').slice(0, 16);
+                if (nikClean.length >= 14) {
+                    $('nik').value = nikClean;
+                    filled.push('NIK');
+                }
             }
 
-            // 4. Ekstrak Nama
-            const nama = extractNama(text);
-            if (nama && $('nama')) {
-                $('nama').value = nama;
-                foundNama = true;
-                summary.push('Nama ✓');
+            if (ktpData.nama && $('nama')) {
+                $('nama').value = ktpData.nama.trim();
+                filled.push('Nama');
             }
 
-            // 5. Ekstrak Tanggal Lahir (bonus)
-            const tgl = extractTglLahir(text);
-            if (tgl && $('tgl_lahir') && !$('tgl_lahir').value) {
-                $('tgl_lahir').value = tgl;
-                summary.push('Tgl Lahir ✓');
+            if (ktpData.tgl_lahir && $('tgl_lahir')) {
+                $('tgl_lahir').value = ktpData.tgl_lahir;
+                filled.push('Tgl Lahir');
             }
 
-            // 6. Ekstrak Jenis Kelamin (bonus)
-            const jk = extractJK(text);
-            if (jk && $('jk')) {
-                $('jk').value = jk;
-                summary.push('JK ✓');
+            if (ktpData.jk && $('jk')) {
+                const jkVal = String(ktpData.jk).toUpperCase().trim();
+                if (jkVal === 'L' || jkVal === 'P') {
+                    $('jk').value = jkVal;
+                    filled.push('Jenis Kelamin');
+                }
             }
 
-            // 7. Ekstrak Alamat (bonus)
-            const alamat = extractAlamat(text);
-            if (alamat && $('alamat') && !$('alamat').value) {
-                $('alamat').value = alamat;
-                summary.push('Alamat ✓');
+            if (ktpData.alamat && $('alamat') && !$('alamat').value) {
+                $('alamat').value = ktpData.alamat.trim();
+                filled.push('Alamat');
             }
 
-            // 8. Tampilkan hasil
-            if (foundNIK || foundNama) {
-                showToast("✅ KTP terbaca: " + summary.join(', '), "success");
+            // Feedback hasil
+            if (filled.length > 0) {
+                showToast('✅ KTP terbaca: ' + filled.join(', '), 'success');
             } else {
-                showToast("⚠️ KTP kurang jelas. Coba foto lebih dekat & terang.", "warning");
-                console.warn('[KTP OCR] Tidak bisa ekstrak data. Raw text:', text);
+                showToast('⚠️ KTP tidak terbaca. Pastikan foto jelas & KTP penuh.', 'warning');
             }
 
         } catch (err) {
-            console.error('[KTP OCR Error]', err);
-            showToast("❌ Gagal membaca KTP. Pastikan gambar jelas & pencahayaan cukup.", "error");
-        }
+            console.error('[KTP Claude Vision Error]', err);
 
-        // Reset agar bisa scan ulang file yang sama
-        camInput.value = '';
+            // Error spesifik jika API key tidak ada
+            if (err.message.includes('401') || err.message.includes('403')) {
+                showToast('❌ API Key tidak valid. Hubungi admin.', 'error');
+            } else if (err.message.includes('429')) {
+                showToast('⚠️ Terlalu banyak request. Tunggu sebentar.', 'warning');
+            } else {
+                showToast('❌ Gagal baca KTP. Coba lagi atau isi manual.', 'error');
+            }
+        } finally {
+            // Kembalikan tampilan tombol scan
+            if (scanLabel) scanLabel.textContent = 'Ketuk untuk Scan KTP Otomatis';
+            if (scanIcon)  scanIcon.textContent  = '📷';
+            if (scanBox)   scanBox.style.opacity  = '1';
+            camInput.value = '';
+        }
     });
 }
