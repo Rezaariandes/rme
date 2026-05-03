@@ -132,6 +132,10 @@ async function lanjutPemeriksaan() {
         currentPasienId = data.pasien.id;
         currentRiwayat  = data.riwayat || [];
 
+        // Isi field alergi dari data PASIEN (bukan kunjungan) — data permanen
+        if ($('alergi')) $('alergi').value = data.pasien.alergi || '';
+        localStorage.setItem('rme_alergi', data.pasien.alergi || '');
+
         // FIX Bug 1: Gunakan data.kunjunganHariIni yang dikembalikan langsung oleh
         // sb_checkAndUpsertPasien() — lebih andal daripada mencari ulang di currentRiwayat
         // dengan format tanggal Indo (DD/MM/YYYY) yang tidak cocok dengan format ISO (YYYY-MM-DD)
@@ -200,6 +204,7 @@ function _isiFormDariKunjungan(h) {
     if ($('lab_creatinin')) $('lab_creatinin').value = h.lab_creatinin || '';
     if ($('keluhan')) $('keluhan').value = h.keluhan || '';
     if ($('fisik'))   $('fisik').value   = h.fisik   || '';
+    // CATATAN: alergi diisi dari data pasien, bukan kunjungan — lihat pemanggil fungsi ini
 
     // FIX Bug 2: diagnosa2 kini disimpan sebagai kolom terpisah di Supabase.
     // Prioritaskan h.diagnosa2 langsung; fallback ke format lama "diag1 | diag2"
@@ -212,7 +217,7 @@ function _isiFormDariKunjungan(h) {
         if ($('diagnosa2')) $('diagnosa2').value = diagParts[1] || '';
     }
     if ($('terapi'))      $('terapi').value      = h.terapi      || '';
-    if ($('suratSakit'))  $('suratSakit').checked = (h.surat_sakit === true || h.surat_sakit === 'YA');
+    if ($('suratSakit'))  $('suratSakit').checked = !!h.surat_sakit;
 }
 
 // ── RESET SESI PENDAFTARAN ──
@@ -222,8 +227,7 @@ function resetSession() {
     currentKunjunganId = null;
     currentRiwayat     = [];
     ['nama', 'nik', 'alamat', 'tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
-    if ($('jk'))        $('jk').value        = 'L';
-    if ($('suratSakit')) $('suratSakit').checked = false;
+    if ($('jk')) $('jk').value = 'L';
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
     const firstNav = document.querySelector('.nav-item');
     if (firstNav) firstNav.classList.add('active-nav');

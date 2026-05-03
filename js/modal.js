@@ -89,17 +89,16 @@ function openModal(index) {
             `<br>RR: ${r.rr||'-'} x/m &nbsp;|&nbsp; BB: ${r.bb||'-'} kg &nbsp;|&nbsp; TB: ${r.tb||'-'} cm`;
     }
 
-    // ── VIEW: Alergi ──
+    // ── VIEW: Alergi — diambil dari data pasien (permanen), bukan kunjungan ──
     const alergiRow = $('viewAlergiRow');
     const alergiEl  = $('viewAlergi');
     if (alergiRow && alergiEl) {
-        if (r.alergi && r.alergi.trim()) {
-            alergiEl.innerText      = r.alergi;
-            alergiRow.style.display = '';
-        } else {
-            alergiEl.innerText      = 'Tidak ada / tidak tercatat';
-            alergiRow.style.display = '';   // tetap tampilkan agar informasi terlihat
-        }
+        // Cari alergi dari cache allPatients menggunakan currentPasienId
+        const pasienCache = (typeof allPatients !== 'undefined' ? allPatients : []);
+        const pasienData  = pasienCache.find(p => p.id === currentPasienId);
+        const alergiVal   = (pasienData && pasienData.alergi) ? pasienData.alergi.trim() : '';
+        alergiEl.innerText      = alergiVal || 'Tidak ada / tidak tercatat';
+        alergiRow.style.display = '';
     }
 
     // ── VIEW: Keluhan & Fisik ──
@@ -174,8 +173,12 @@ function openModal(index) {
     if ($('modalBb'))      $('modalBb').value       = r.bb      || '';
     if ($('modalTb'))      $('modalTb').value       = r.tb      || '';
 
-    // Alergi
-    if ($('modalAlergi')) $('modalAlergi').value = r.alergi || '';
+    // Alergi — dari data pasien (permanen)
+    if ($('modalAlergi')) {
+        const pasienCache2 = (typeof allPatients !== 'undefined' ? allPatients : []);
+        const pasienData2  = pasienCache2.find(p => p.id === currentPasienId);
+        $('modalAlergi').value = (pasienData2 && pasienData2.alergi) ? pasienData2.alergi : '';
+    }
 
     // Keluhan & Fisik
     if ($('modalKeluhan')) $('modalKeluhan').value = r.keluhan || '';
@@ -271,15 +274,33 @@ async function simpanEditModal() {
 
     try {
         await sb_saveKunjungan(payload);
+
+        // Update alergi ke tabel pasien (data permanen) dan cache lokal allPatients
+        const alergiVal = $('modalAlergi') ? $('modalAlergi').value.trim() : '';
+        if (currentPasienId && currentPasienId !== 'null') {
+            await _sbFetch(`pasien?id=eq.${currentPasienId}`, {
+                method: 'PATCH',
+                body: { alergi: alergiVal || null },
+                prefer: 'return=minimal'
+            });
+        }
+        // Sync cache allPatients agar tampilan modal langsung update
+        if (typeof allPatients !== 'undefined') {
+            const pIdx = allPatients.findIndex(p => p.id === currentPasienId);
+            if (pIdx !== -1) allPatients[pIdx].alergi = alergiVal;
+        }
+        // Sync form utama jika sedang di halaman medis
+        if ($('alergi')) $('alergi').value = alergiVal;
+        localStorage.setItem('rme_alergi', alergiVal);
+
         showToast("✅ Perubahan berhasil disimpan", "success");
 
-        // Update cache lokal agar list riwayat langsung sinkron
+        // Update cache lokal kunjungan (tanpa alergi — sudah di pasien)
         Object.assign(r, {
             keluhan:  payload.keluhan,  fisik:    payload.fisik,
             td:       payload.td,       nadi:     payload.nadi,
             suhu:     payload.suhu,     rr:       payload.rr,
             bb:       payload.bb,       tb:       payload.tb,
-            alergi:   payload.alergi,
             lab_gds:  payload.lab_gds,  lab_chol: payload.lab_chol,
             lab_ua:   payload.lab_ua,
             diag:     payload.diagnosa, terapi:   payload.terapi

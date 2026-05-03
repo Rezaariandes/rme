@@ -145,7 +145,7 @@ async function _sha256(text) {
 // ═══════════════════════════════════════
 async function sb_initData(filterDate) {
     const [pasien, kunjungan, users] = await Promise.all([
-        _sbFetch('pasien?select=id,nama,nik,jk,tgl_lahir,alamat&order=nama.asc'),
+        _sbFetch('pasien?select=id,nama,nik,jk,tgl_lahir,alamat,alergi&order=nama.asc'),
         _sbFetch(`kunjungan?tgl=eq.${filterDate}&select=*&order=waktu.asc`),
         _sbFetch('users?select=id,nama,jabatan&order=nama.asc')
     ]);
@@ -172,7 +172,8 @@ async function sb_initData(filterDate) {
     return {
         pasien: pasien.map(p => ({
             id: p.id, nama: p.nama, nik: p.nik,
-            jk: p.jk, tgl: p.tgl_lahir, alamat: p.alamat
+            jk: p.jk, tgl: p.tgl_lahir, alamat: p.alamat,
+            alergi: p.alergi || ''
         })),
         hariIni
     };
@@ -264,7 +265,8 @@ async function sb_checkAndUpsertPasien(payload) {
     return {
         pasien: {
             id: pasienRow.id, nama: pasienRow.nama, nik: pasienRow.nik,
-            jk: pasienRow.jk, tgl_lahir: pasienRow.tgl_lahir, alamat: pasienRow.alamat
+            jk: pasienRow.jk, tgl_lahir: pasienRow.tgl_lahir, alamat: pasienRow.alamat,
+            alergi: pasienRow.alergi || ''
         },
         // kunjunganHariIni: data kunjungan aktif (lengkap) untuk di-populate ke form
         kunjunganHariIni: kunjunganHariIni ? _mapKunjungan(kunjunganHariIni) : null,
@@ -273,16 +275,16 @@ async function sb_checkAndUpsertPasien(payload) {
 }
 
 async function sb_savePasienOnly(payload) {
-    const { pasienId, nama, nik, jk, tgl_lahir, alamat } = payload;
+    const { pasienId, nama, nik, jk, tgl_lahir, alamat, alergi } = payload;
     if (pasienId) {
         await _sbFetch(`pasien?id=eq.${pasienId}`, {
             method: 'PATCH',
-            body: { nama, nik, jk, tgl_lahir, alamat },
+            body: { nama, nik, jk, tgl_lahir, alamat, alergi: alergi || null },
             prefer: 'return=minimal'
         });
         return { status: 'Sukses', pasienId };
     } else {
-        const rows = await _sbFetch('pasien', { method: 'POST', body: { nama, nik, jk, tgl_lahir, alamat } });
+        const rows = await _sbFetch('pasien', { method: 'POST', body: { nama, nik, jk, tgl_lahir, alamat, alergi: alergi || null } });
         return { status: 'Sukses', pasienId: rows[0]?.id };
     }
 }
@@ -348,14 +350,15 @@ async function sb_saveKunjungan(payload) {
         lab_gdp, lab_hba1c,
         lab_sgot, lab_sgpt,
         lab_ureum, lab_creatinin,
-        keluhan, fisik, alergi, diagnosa, diagnosa2, terapi, suratSakit
+        keluhan, fisik, diagnosa, diagnosa2, terapi, suratSakit,
+        alergi
     } = payload;
 
     // BUG E FIX: Guard — jangan PATCH pasien jika pasienId tidak valid
     if (pasienId && pasienId !== 'null' && pasienId !== 'undefined') {
         await _sbFetch(`pasien?id=eq.${pasienId}`, {
             method: 'PATCH',
-            body: { nama, nik, jk, ...(tgl_lahir && {tgl_lahir}), ...(alamat && {alamat}) },
+            body: { nama, nik, jk, ...(tgl_lahir && {tgl_lahir}), ...(alamat && {alamat}), alergi: alergi || null },
             prefer: 'return=minimal'
         });
     }
@@ -403,7 +406,6 @@ async function sb_saveKunjungan(payload) {
         lab_creatinin:_num(lab_creatinin),
         keluhan: keluhan || null,
         fisik:   fisik   || null,
-        alergi:  alergi  || null,
         diagnosa:  diagnosa  || null,
         diagnosa2: diagnosa2 || null,
         terapi:    terapi    || null,

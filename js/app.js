@@ -194,6 +194,21 @@ async function initApp() {
                 console.warn('[Klikpro] Gagal fetch kunjungan saat reload, fallback autosave:', e.message);
                 if (typeof loadAutosave === 'function') loadAutosave();
             }
+            // Fetch alergi dari tabel pasien (data permanen) — tidak ikut di kunjungan
+            if (currentPasienId && currentPasienId !== 'null') {
+                try {
+                    const pasienRows = await _sbFetch(`pasien?id=eq.${currentPasienId}&select=alergi&limit=1`);
+                    if (pasienRows && pasienRows[0]) {
+                        const alergiVal = pasienRows[0].alergi || '';
+                        if ($('alergi')) $('alergi').value = alergiVal;
+                        localStorage.setItem('rme_alergi', alergiVal);
+                    }
+                } catch(e) {
+                    // Fallback ke localStorage jika fetch pasien gagal
+                    const saved = localStorage.getItem('rme_alergi');
+                    if ($('alergi') && saved) $('alergi').value = saved;
+                }
+            }
         } else {
             // Kunjungan baru (belum disimpan) — pakai autosave
             if (typeof loadAutosave === 'function') loadAutosave();

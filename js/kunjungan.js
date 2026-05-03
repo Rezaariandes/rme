@@ -124,6 +124,9 @@ async function bukaRekamMedisHariIni(kId) {
         if ($('jk'))        $('jk').value         = p.jk     || 'L';
         if ($('alamat'))    $('alamat').value     = p.alamat || '';
         if ($('tgl_lahir')) $('tgl_lahir').value  = formatTglIndo(p.tgl) || '';
+        // Alergi diambil dari data pasien (permanen), bukan kunjungan
+        if ($('alergi'))    $('alergi').value     = p.alergi || '';
+        localStorage.setItem('rme_alergi', p.alergi || '');
     } else {
         if ($('nama')) $('nama').value = namaPasien;
     }
@@ -316,8 +319,7 @@ async function saveAll() {
                 setTimeout(() => {
                     currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
                     ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
-                    if ($('jk'))        $('jk').value        = 'L';
-                    if ($('suratSakit')) $('suratSakit').checked = false;
+                    if ($('jk')) $('jk').value = 'L';
                     if (btn) { btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis"; }
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
                     const firstNav = document.querySelector('.nav-item');
