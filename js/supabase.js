@@ -129,8 +129,15 @@ async function sb_initData(filterDate) {
         return {
             id: k.id, pasienId: k.pasien_id,
             nama: p.nama || '', waktu: k.waktu, tgl: k.tgl,
-            td: k.td, suhu: k.suhu, keluhan: k.keluhan,
-            diag: k.diagnosa, status: k.status || 'Menunggu'
+            // FIX: Sertakan semua field kunjungan — sebelumnya hanya td, suhu, keluhan, diag
+            // yang menyebabkan form kosong saat bukaRekamMedisHariIni() dipanggil
+            td: k.td, nadi: k.nadi, suhu: k.suhu, rr: k.rr,
+            bb: k.bb, tb: k.tb,
+            lab_gds: k.lab_gds, lab_chol: k.lab_chol, lab_ua: k.lab_ua,
+            keluhan: k.keluhan, fisik: k.fisik,
+            diag: k.diagnosa, diagnosa2: k.diagnosa2,
+            terapi: k.terapi, surat_sakit: k.surat_sakit,
+            status: k.status || 'Menunggu'
         };
     });
 

@@ -132,8 +132,18 @@ async function bukaRekamMedisHariIni(kId) {
         $('infoTglPemeriksaan').style.display = 'block';
     }
 
-    // Isi form TTV
-    _isiFormDariKunjungan(h);
+    // FIX: Data di array kunjunganHariIni (dari sb_initData) hanya berisi field ringkas
+    // (td, suhu, keluhan, diag) — field seperti nadi, rr, bb, tb, lab_gds, lab_chol,
+    // lab_ua, fisik, terapi, surat_sakit tidak ikut di-map.
+    // Solusi: fetch data kunjungan lengkap dari Supabase via sb_getKunjunganById()
+    // sebelum mengisi form, agar semua field tampil dengan benar.
+    try {
+        const kunjunganLengkap = await sb_getKunjunganById(kId);
+        _isiFormDariKunjungan(kunjunganLengkap || h);
+    } catch (e) {
+        console.warn('[Klikpro] Gagal fetch kunjungan lengkap, fallback ke data ringkas:', e.message);
+        _isiFormDariKunjungan(h);
+    }
     document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.setItem('rme_' + el.id, el.value));
     calculateIMT(); checkTensi(); checkLabAlert();
 
