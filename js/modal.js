@@ -9,14 +9,26 @@ function openModal(index) {
     if (!r) return;
     if ($('modalIndex')) $('modalIndex').value = index;
 
+    // ── VIEW: Header tanggal ──
     if ($('modalTanggalInfoView'))
         $('modalTanggalInfoView').innerText =
             "📅 " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
+
+    // ── VIEW: TTV — pisahkan sistol/diastol jika format "120/80" ──
+    if ($('viewTtv')) {
+        const tdParts = (r.td || '').split('/');
+        const sistol  = tdParts[0] ? tdParts[0].trim() : '-';
+        const diastol = tdParts[1] ? tdParts[1].trim() : '-';
+        $('viewTtv').innerHTML =
+            `TD: ${sistol}/${diastol} mmHg &nbsp;|&nbsp; Nadi: ${r.nadi||'-'} x/m &nbsp;|&nbsp; Suhu: ${r.suhu||'-'} °C` +
+            `<br>RR: ${r.rr||'-'} x/m &nbsp;|&nbsp; BB: ${r.bb||'-'} kg &nbsp;|&nbsp; TB: ${r.tb||'-'} cm`;
+    }
+
+    // ── VIEW: Keluhan & Fisik ──
     if ($('viewKeluhan')) $('viewKeluhan').innerText = r.keluhan || '-';
     if ($('viewFisik'))   $('viewFisik').innerText   = r.fisik   || '-';
-    if ($('viewTtv'))     $('viewTtv').innerHTML     =
-        `TD: ${r.td||'-'} | N: ${r.nadi||'-'} | S: ${r.suhu||'-'} <br> RR: ${r.rr||'-'} | BB: ${r.bb||'-'} | TB: ${r.tb||'-'}`;
 
+    // ── VIEW: Lab ──
     const labRow = $('viewLabRow');
     const hasLab = r.lab_gds || r.lab_chol || r.lab_ua;
     if (labRow) labRow.style.display = hasLab ? '' : 'none';
@@ -24,10 +36,11 @@ function openModal(index) {
         ? `GDS: ${r.lab_gds||'-'} mg/dL &nbsp;|&nbsp; Kolesterol: ${r.lab_chol||'-'} mg/dL &nbsp;|&nbsp; Asam Urat: ${r.lab_ua||'-'} mg/dL`
         : '-';
 
-    if ($('viewDiag'))   $('viewDiag').innerText   = r.diag   || '-';
-    if ($('viewTerapi')) $('viewTerapi').innerText  = r.terapi || '-';
+    // ── VIEW: Diagnosa & Terapi ──
+    if ($('viewDiag'))   $('viewDiag').innerText  = r.diag   || '-';
+    if ($('viewTerapi')) $('viewTerapi').innerText = r.terapi || '-';
 
-    // Dokter pemeriksa — dari field dokterNama yang di-resolve oleh supabase.js
+    // ── VIEW: Dokter Pemeriksa ──
     const dokterRow = $('viewDokterRow');
     const dokterEl  = $('viewDokterPemeriksa');
     if (dokterEl && dokterRow) {
@@ -39,21 +52,31 @@ function openModal(index) {
         }
     }
 
+    // ── EDIT: Header tanggal ──
     if ($('modalTanggalInfoEdit'))
         $('modalTanggalInfoEdit').innerText =
             "✏️ Edit: " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
-    if ($('modalKeluhan')) $('modalKeluhan').value = r.keluhan || '';
-    if ($('modalFisik'))   $('modalFisik').value   = r.fisik   || '';
-    if ($('modalTd'))      $('modalTd').value      = r.td      || '';
+
+    // ── EDIT: TTV — pisahkan td "120/80" ke dua field terpisah ──
+    const tdParts = (r.td || '').split('/');
+    if ($('modalSistol'))  $('modalSistol').value  = tdParts[0] ? tdParts[0].trim() : '';
+    if ($('modalDiastol')) $('modalDiastol').value = tdParts[1] ? tdParts[1].trim() : '';
     if ($('modalNadi'))    $('modalNadi').value     = r.nadi    || '';
     if ($('modalSuhu'))    $('modalSuhu').value     = r.suhu    || '';
     if ($('modalRr'))      $('modalRr').value       = r.rr      || '';
     if ($('modalBb'))      $('modalBb').value       = r.bb      || '';
     if ($('modalTb'))      $('modalTb').value       = r.tb      || '';
-    if ($('modalLabGds'))  $('modalLabGds').value   = r.lab_gds  || '';
-    if ($('modalLabChol')) $('modalLabChol').value  = r.lab_chol || '';
-    if ($('modalLabUa'))   $('modalLabUa').value    = r.lab_ua   || '';
 
+    // ── EDIT: Keluhan & Fisik ──
+    if ($('modalKeluhan')) $('modalKeluhan').value = r.keluhan || '';
+    if ($('modalFisik'))   $('modalFisik').value   = r.fisik   || '';
+
+    // ── EDIT: Lab ──
+    if ($('modalLabGds'))  $('modalLabGds').value  = r.lab_gds  || '';
+    if ($('modalLabChol')) $('modalLabChol').value = r.lab_chol || '';
+    if ($('modalLabUa'))   $('modalLabUa').value   = r.lab_ua   || '';
+
+    // ── EDIT: Diagnosa ──
     const diagLama = String(r.diag || '');
     if (diagLama.includes(" | ")) {
         if ($('modalDiag1')) $('modalDiag1').value = diagLama.split(" | ")[0];
@@ -64,13 +87,20 @@ function openModal(index) {
     }
     if ($('modalTerapi')) $('modalTerapi').value = r.terapi || '';
 
-    toggleEditModal(false);
+    // ── ROLE: Sembunyikan Diagnosa & Terapi untuk Paramedis ──
+    const isParamedis = window._isParamedis === true;
 
-    const isPerawat = window._isParamedis === true;
-    const viewDiagRow = $('viewDiag') ? $('viewDiag').closest('.detail-row') : null;
-    if (viewDiagRow) viewDiagRow.style.display = isPerawat ? 'none' : '';
-    const diagEditRow = $('modalDiag1') ? $('modalDiag1').closest('.row') : null;
-    if (diagEditRow) diagEditRow.style.display = isPerawat ? 'none' : '';
+    // View mode
+    const viewDiagRow   = $('viewDiagRow');
+    const viewTerapiRow = $('viewTerapiRow');
+    if (viewDiagRow)   viewDiagRow.style.display   = isParamedis ? 'none' : '';
+    if (viewTerapiRow) viewTerapiRow.style.display  = isParamedis ? 'none' : '';
+
+    // Edit mode
+    const editDiagSection = $('modalEditDiagSection');
+    if (editDiagSection) editDiagSection.style.display = isParamedis ? 'none' : '';
+
+    toggleEditModal(false);
 
     const modal = $('modalRiwayat');
     if (modal) modal.classList.add('show');
@@ -105,37 +135,41 @@ async function simpanEditModal() {
     const d2 = $('modalDiag2') ? $('modalDiag2').value : '';
     const diagGabung = d2 ? (d1 + " | " + d2) : d1;
 
+    // Gabungkan sistol/diastol kembali ke format "120/80"
+    const sistol  = $('modalSistol')  ? $('modalSistol').value.trim()  : '';
+    const diastol = $('modalDiastol') ? $('modalDiastol').value.trim() : '';
+    const tdGabung = (sistol && diastol) ? `${sistol}/${diastol}` : (sistol || diastol || '');
+
     const payload = {
         pasienId:    currentPasienId,
         kunjunganId: r.id,
         keluhan:  $('modalKeluhan') ? $('modalKeluhan').value : '',
         fisik:    $('modalFisik')   ? $('modalFisik').value   : '',
-        td:       $('modalTd')      ? $('modalTd').value      : '',
-        nadi:     $('modalNadi')    ? $('modalNadi').value     : '',
-        suhu:     $('modalSuhu')    ? $('modalSuhu').value     : '',
-        rr:       $('modalRr')      ? $('modalRr').value       : '',
-        bb:       $('modalBb')      ? $('modalBb').value       : '',
-        tb:       $('modalTb')      ? $('modalTb').value       : '',
-        lab_gds:  $('modalLabGds')  ? $('modalLabGds').value   : '',
-        lab_chol: $('modalLabChol') ? $('modalLabChol').value  : '',
-        lab_ua:   $('modalLabUa')   ? $('modalLabUa').value    : '',
+        td:       tdGabung,
+        nadi:     $('modalNadi')    ? $('modalNadi').value    : '',
+        suhu:     $('modalSuhu')    ? $('modalSuhu').value    : '',
+        rr:       $('modalRr')      ? $('modalRr').value      : '',
+        bb:       $('modalBb')      ? $('modalBb').value      : '',
+        tb:       $('modalTb')      ? $('modalTb').value      : '',
+        lab_gds:  $('modalLabGds')  ? $('modalLabGds').value  : '',
+        lab_chol: $('modalLabChol') ? $('modalLabChol').value : '',
+        lab_ua:   $('modalLabUa')   ? $('modalLabUa').value   : '',
         diagnosa: diagGabung,
-        terapi:   $('modalTerapi')  ? $('modalTerapi').value   : ''
+        terapi:   $('modalTerapi')  ? $('modalTerapi').value  : ''
     };
 
     try {
-        // FIX: Ganti fetch(APP_URL) → sb_saveKunjungan()
         await sb_saveKunjungan(payload);
         showToast("✅ Perubahan berhasil disimpan", "success");
 
         Object.assign(r, {
-            keluhan: payload.keluhan, fisik:    payload.fisik,
-            td:      payload.td,      nadi:     payload.nadi,
-            suhu:    payload.suhu,    rr:       payload.rr,
-            bb:      payload.bb,      tb:       payload.tb,
-            lab_gds: payload.lab_gds, lab_chol: payload.lab_chol,
-            lab_ua:  payload.lab_ua,
-            diag:    payload.diagnosa, terapi:  payload.terapi
+            keluhan:  payload.keluhan,  fisik:    payload.fisik,
+            td:       payload.td,       nadi:     payload.nadi,
+            suhu:     payload.suhu,     rr:       payload.rr,
+            bb:       payload.bb,       tb:       payload.tb,
+            lab_gds:  payload.lab_gds,  lab_chol: payload.lab_chol,
+            lab_ua:   payload.lab_ua,
+            diag:     payload.diagnosa, terapi:   payload.terapi
         });
 
         renderRiwayatList(currentRiwayat, 'historyListMedis');
