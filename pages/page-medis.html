@@ -29,7 +29,16 @@
                         <div class="col-6 col-sm-2"><div class="ttv-item"><label>BB (kg)</label><input type="number" id="bb" placeholder="60" data-save="true"></div></div>
                         <div class="col-6 col-sm-2"><div class="ttv-item"><label>TB (cm)</label><input type="number" id="tb" placeholder="165" data-save="true"></div></div>
                     </div>
-                    <div id="imtCalc" style="text-align:right;font-size:11px;font-weight:700;color:var(--primary);margin-top:2px;margin-bottom:12px;padding-right:4px;"></div>
+                    <div id="imtCalc" style="text-align:right;font-size:11px;font-weight:700;color:var(--primary);margin-top:2px;margin-bottom:10px;padding-right:4px;"></div>
+
+                    <!-- ── Riwayat Alergi (bagian dari seksi TTV) ── -->
+                    <div style="background:rgba(180,83,9,0.06);border:1px solid rgba(180,83,9,0.22);border-radius:10px;padding:10px 12px;margin-bottom:4px;">
+                        <label class="form-label" style="color:#b45309;font-weight:700;margin-bottom:6px;display:block;">⚠️ Riwayat Alergi</label>
+                        <input type="text" id="alergi" class="form-control" data-save="true"
+                               placeholder="Contoh: Penisilin, Sulfa, Udang — kosongkan jika tidak ada"
+                               style="border-color:rgba(180,83,9,0.3);">
+                        <div style="font-size:10px;color:#92400e;margin-top:4px;">Isi jika pasien memiliki riwayat alergi obat atau makanan</div>
+                    </div>
                 </div>
 
                 <!-- ══ SUB-MODUL: KELUHAN UTAMA ══ -->
