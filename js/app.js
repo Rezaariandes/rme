@@ -144,7 +144,30 @@ async function initApp() {
             currentRiwayat = [];
         }
 
-        if (typeof loadAutosave === 'function') loadAutosave();
+        // FIX Bug 3: Saat reload, fetch data kunjungan langsung dari Supabase
+        // agar form selalu menampilkan data aktual dari database — bukan hanya
+        // dari localStorage yang bisa stale atau kosong.
+        if (currentKunjunganId) {
+            try {
+                const kunjunganData = await sb_getKunjunganById(currentKunjunganId);
+                if (kunjunganData && typeof _isiFormDariKunjungan === 'function') {
+                    _isiFormDariKunjungan(kunjunganData);
+                    document.querySelectorAll('[data-save="true"]').forEach(el =>
+                        localStorage.setItem('rme_' + el.id, el.value)
+                    );
+                } else {
+                    // Fallback ke autosave localStorage jika fetch gagal
+                    if (typeof loadAutosave === 'function') loadAutosave();
+                }
+            } catch (e) {
+                console.warn('[Klikpro] Gagal fetch kunjungan saat reload, fallback autosave:', e.message);
+                if (typeof loadAutosave === 'function') loadAutosave();
+            }
+        } else {
+            // Kunjungan baru (belum disimpan) — pakai autosave
+            if (typeof loadAutosave === 'function') loadAutosave();
+        }
+
         calculateIMT();
         checkTensi();
         checkLabAlert();

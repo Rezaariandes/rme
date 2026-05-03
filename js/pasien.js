@@ -132,22 +132,18 @@ async function lanjutPemeriksaan() {
         currentPasienId = data.pasien.id;
         currentRiwayat  = data.riwayat || [];
 
-        const tglIndoNorm  = `${parseInt(parts[2])}/${parseInt(parts[1])}/${parts[0]}`;
-        const visitHariIni = currentRiwayat.find(r => {
-            const t = String(r.tgl || '').trim();
-            return t === tglIndoFull || t === tglIndoNorm || t === localDateStr;
-        });
-
-        if (visitHariIni) {
-            currentKunjunganId = visitHariIni.id;
-            _isiFormDariKunjungan(visitHariIni);
+        // FIX Bug 1: Gunakan data.kunjunganHariIni yang dikembalikan langsung oleh
+        // sb_checkAndUpsertPasien() — lebih andal daripada mencari ulang di currentRiwayat
+        // dengan format tanggal Indo (DD/MM/YYYY) yang tidak cocok dengan format ISO (YYYY-MM-DD)
+        // yang tersimpan di field r.tgl dari Supabase.
+        if (data.kunjunganHariIni) {
+            currentKunjunganId = data.kunjunganHariIni.id;
+            _isiFormDariKunjungan(data.kunjunganHariIni);
             document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.setItem('rme_' + el.id, el.value));
-            calculateIMT(); checkTensi();
+            calculateIMT(); checkTensi(); checkLabAlert();
             showToast("ℹ️ Melanjutkan data pemeriksaan hari ini", "info");
         } else {
-            // BUG FIX: Jika tidak ada kunjungan hari ini, ID harus null (akan dibuat baru saat saveAll).
-            // Sebelumnya di-set ke currentRiwayat[0].id yang merupakan kunjungan LAMA
-            // sehingga menyebabkan overwrite rekam medis kunjungan sebelumnya.
+            // Belum ada kunjungan hari ini — ID null, akan dibuat baru saat saveAll()
             currentKunjunganId = null;
             showToast("✅ Siap periksa: " + namaPasien, "success");
         }
@@ -182,15 +178,18 @@ function _isiFormDariKunjungan(h) {
     if ($('keluhan')) $('keluhan').value = h.keluhan || '';
     if ($('fisik'))   $('fisik').value   = h.fisik   || '';
 
-    let diagLama = String(h.diag || '');
-    if (diagLama.includes(" | ")) {
-        if ($('diagnosa'))  $('diagnosa').value  = diagLama.split(" | ")[0];
-        if ($('diagnosa2')) $('diagnosa2').value = diagLama.split(" | ")[1];
-    } else {
-        if ($('diagnosa'))  $('diagnosa').value  = diagLama;
-        if ($('diagnosa2')) $('diagnosa2').value = '';
+    // FIX Bug 2: diagnosa2 kini disimpan sebagai kolom terpisah di Supabase.
+    // Prioritaskan h.diagnosa2 langsung; fallback ke format lama "diag1 | diag2"
+    // untuk kompatibilitas data lama.
+    if ($('diagnosa'))  $('diagnosa').value  = h.diag || '';
+    if ($('diagnosa2')) $('diagnosa2').value = h.diagnosa2 || '';
+    if (!h.diagnosa2 && h.diag && h.diag.includes(' | ')) {
+        const diagParts = h.diag.split(' | ');
+        if ($('diagnosa'))  $('diagnosa').value  = diagParts[0] || '';
+        if ($('diagnosa2')) $('diagnosa2').value = diagParts[1] || '';
     }
-    if ($('terapi')) $('terapi').value = h.terapi || '';
+    if ($('terapi'))      $('terapi').value      = h.terapi      || '';
+    if ($('suratSakit'))  $('suratSakit').checked = !!h.surat_sakit;
 }
 
 // ── RESET SESI PENDAFTARAN ──
