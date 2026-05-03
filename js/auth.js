@@ -13,9 +13,10 @@ function initPinLock() {
     const now        = Date.now();
 
     if (isUnlocked === 'true' && expiryTime && now < parseInt(expiryTime)) {
-        $('pinScreen').style.display = 'none';
+        const pinScreen = document.getElementById('pinScreen');
+        if (pinScreen) pinScreen.style.display = 'none';
 
-        const drNameEl = $('drName');
+        const drNameEl = document.getElementById('drName');
         if (drNameEl && localStorage.getItem('rme_drName')) {
             drNameEl.innerText = localStorage.getItem('rme_drName');
         }
@@ -35,28 +36,29 @@ function initPinLock() {
     localStorage.removeItem('logged_user');
     localStorage.removeItem('session_expiry');
 
-    $('pinScreen').style.display = 'flex';
+    const pinScreen = document.getElementById('pinScreen');
+    if (pinScreen) pinScreen.style.display = 'flex';
+    
     loadLoginUsers();
     updatePinDots();
 }
 
-// ── MENGAMBIL DAFTAR USER (tanpa data PIN) ──
+// ── MENGAMBIL DAFTAR USER DARI SUPABASE ──
 async function loadLoginUsers() {
-    const select = $('loginUserSelect');
+    const select = document.getElementById('loginUserSelect');
     if (!select) return;
     select.innerHTML = '<option value="">Memuat user...</option>';
+    
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "getUsers" })
-        });
-        const data = await res.json();
+        // Menggunakan fungsi dari Supabase Client
+        const res = await sb_getUsers();
+        
         select.innerHTML = '';
 
-        if (data.status === "success" && data.data && data.data.length > 0) {
-            data.data.forEach((u, i) => {
-                const opt      = document.createElement('option');
-                opt.value      = u.id;
+        if (res.status === "success" && res.data && res.data.length > 0) {
+            res.data.forEach((u, i) => {
+                const opt       = document.createElement('option');
+                opt.value       = u.id;
                 opt.textContent = u.nama + ' (' + u.jabatan + ')';
                 if (i === 0) opt.selected = true;
                 select.appendChild(opt);
@@ -65,6 +67,7 @@ async function loadLoginUsers() {
             select.innerHTML = '<option value="">Belum ada user / Gagal memuat</option>';
         }
     } catch (e) {
+        console.error("Gagal muat user:", e);
         if (select) select.innerHTML = '<option value="">Koneksi bermasalah</option>';
     }
 }
@@ -86,7 +89,7 @@ function deletePin() {
 }
 
 function updatePinDots() {
-    const dotsEl = $('pinDots');
+    const dotsEl = document.getElementById('pinDots');
     if (!dotsEl) return;
     const dots = dotsEl.children;
     for (let i = 0; i < 6; i++) {
@@ -94,9 +97,9 @@ function updatePinDots() {
     }
 }
 
-// ── VERIFIKASI PIN KE SERVER ──
+// ── VERIFIKASI PIN KE SUPABASE ──
 async function checkPinServer() {
-    const select = $('loginUserSelect');
+    const select = document.getElementById('loginUserSelect');
     const userId = select ? select.value : '';
 
     if (!userId) {
@@ -104,21 +107,18 @@ async function checkPinServer() {
         return;
     }
 
-    const subtitle = $('pinSubtitle');
+    const subtitle = document.getElementById('pinSubtitle');
     if (subtitle) {
         subtitle.innerText    = "Memverifikasi...";
         subtitle.style.color  = "var(--primary)";
     }
 
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "verifyPin", userId, pin: currentPinInput })
-        });
-        const data = await res.json();
+        // Menggunakan fungsi verifikasi dari Supabase Client
+        const res = await sb_verifyPin(userId, currentPinInput);
 
-        if (data.isValid) {
-            loggedInUser = data.user;
+        if (res.isValid) {
+            loggedInUser = res.user;
 
             // Sesi 3 jam
             const expiry = Date.now() + (3 * 60 * 60 * 1000);
@@ -126,9 +126,9 @@ async function checkPinServer() {
             localStorage.setItem('logged_user',  JSON.stringify(loggedInUser));
             localStorage.setItem('session_expiry', expiry);
 
-            if (data.user) {
-                const label = data.user.nama + " (" + data.user.jabatan + ")";
-                const drEl  = $('drName');
+            if (res.user) {
+                const label = res.user.nama + " (" + res.user.jabatan + ")";
+                const drEl  = document.getElementById('drName');
                 if (drEl) drEl.innerText = label;
                 localStorage.setItem('rme_drName', label);
             }
@@ -139,15 +139,18 @@ async function checkPinServer() {
             showPinError("PIN Salah! Coba lagi.");
         }
     } catch (e) {
+        console.error("Gagal verifikasi PIN:", e);
         showPinError("Koneksi gagal. Cek internet.");
     }
 }
 
 function showPinError(msg) {
-    const subtitle = $('pinSubtitle');
+    const subtitle = document.getElementById('pinSubtitle');
     if (subtitle) { subtitle.innerText = msg; subtitle.style.color = "var(--danger)"; }
-    const dotsEl = $('pinDots');
+    
+    const dotsEl = document.getElementById('pinDots');
     if (dotsEl) Array.from(dotsEl.children).forEach(d => d.classList.add('error'));
+    
     setTimeout(() => {
         currentPinInput = "";
         updatePinDots();
@@ -156,12 +159,14 @@ function showPinError(msg) {
 }
 
 function unlockScreen() {
-    const screen = $('pinScreen');
+    const screen = document.getElementById('pinScreen');
     if (screen) {
         screen.classList.add('hidden');
         setTimeout(() => { screen.style.display = 'none'; }, 420);
     }
-    showToast("🔓 Selamat datang, " + (loggedInUser ? loggedInUser.nama : ''), "success");
+    if (typeof showToast === 'function') {
+        showToast("🔓 Selamat datang, " + (loggedInUser ? loggedInUser.nama : ''), "success");
+    }
 }
 
 // ── PEMBATASAN AKSES BERDASARKAN JABATAN ──
@@ -170,21 +175,24 @@ function applyRoleRestrictions() {
 
     const jabatan     = loggedInUser.jabatan;
     const bolehMedis  = JABATAN_MEDIS.includes(jabatan);
-    const isParamedis   = jabatan === 'Paramedis';
+    const isParamedis = jabatan === 'Paramedis';
 
     // Tombol lanjut periksa
-    const btnNext = $('btnNext');
+    const btnNext = document.getElementById('btnNext');
     if (btnNext) btnNext.style.display = bolehMedis ? '' : 'none';
 
     // Seksi klinis disembunyikan untuk Paramedis
-    const sectionKlinis = $('sectionKlinis');
+    const sectionKlinis = document.getElementById('sectionKlinis');
     if (sectionKlinis) {
-        sectionKlinis.style.display = (jabatan === 'Paramedis') ? 'none' : 'block';
+        sectionKlinis.style.display = isParamedis ? 'none' : 'block';
     }
 
     // ── PERAWAT: Sembunyikan diagnosa di form ──
-    const rowDiagnosa = document.querySelector('#diagnosa')?.closest('.row');
-    if (rowDiagnosa) rowDiagnosa.style.display = isParamedis ? 'none' : '';
+    const diagnosaEl = document.querySelector('#diagnosa');
+    if (diagnosaEl) {
+        const rowDiagnosa = diagnosaEl.closest('.row');
+        if (rowDiagnosa) rowDiagnosa.style.display = isParamedis ? 'none' : '';
+    }
 
     // ── PERAWAT: Sembunyikan nav item halaman User ──
     document.querySelectorAll('.nav-item').forEach(navEl => {
@@ -215,17 +223,12 @@ function logout() {
 // ── CEK AKSES SEBELUM KE pageMedis ──
 function canAccessMedis() {
     if (!loggedInUser) {
-        showToast("⛔ Anda belum login.", "error");
+        if (typeof showToast === 'function') showToast("⛔ Anda belum login.", "error");
         return false;
     }
     if (!JABATAN_MEDIS.includes(loggedInUser.jabatan)) {
-        showToast("⛔ Akses ditolak. Hanya Dokter, Admin & Paramedis.", "error");
+        if (typeof showToast === 'function') showToast("⛔ Akses ditolak. Hanya Dokter, Admin & Paramedis.", "error");
         return false;
     }
     return true;
 }
-
-// ── AUTO-INIT: dipanggil dari initApp() di app.js setelah semua fragment HTML ter-inject ──
-// BUG FIX: Sebelumnya menggunakan DOMContentLoaded yang sudah terlambat (DOM sudah ready
-// saat skrip diinjeksikan dinamis), namun elemen PIN belum tentu ada di DOM jika fragment
-// HTML belum di-inject. initPinLock() sekarang dipanggil eksplisit dari initApp().
