@@ -44,15 +44,19 @@ async function sb_saveSettings(payload) {
                    'klinik_email','jabatan_medis','ocr_api_key','ss_env',
                    'ss_org_id','ss_client_id','ss_client_secret',
                    'ai_gemini','ai_groq','ai_openrouter','ai_openai','ai_mistral',
-                   'module_access']; // FIX: module_access harus di whitelist agar hak akses per jabatan tersimpan ke Supabase
+                   'module_access'];
     for (const key of keys) {
         if (payload[key] === undefined) continue;
         if (key === 'ss_client_secret' && !payload[key]) continue;
+        // FIX: Ganti PATCH ke UPSERT (POST + Prefer: resolution=merge-duplicates).
+        // PATCH ke ?key=eq.xxx mengembalikan HTTP 200 dengan 0 rows affected jika key
+        // belum ada di tabel konfigurasi — data tidak tersimpan tanpa ada error sama sekali.
+        // UPSERT memastikan baris dibuat jika belum ada, atau diupdate jika sudah ada.
         updates.push(
-            _sbFetch('konfigurasi?key=eq.' + key, {
-                method: 'PATCH',
-                body: { value: payload[key] },
-                prefer: 'return=minimal'
+            _sbFetch('konfigurasi', {
+                method: 'POST',
+                body: { key, value: payload[key] },
+                prefer: 'resolution=merge-duplicates,return=minimal'
             })
         );
     }

@@ -170,6 +170,9 @@ function _renderSettingsPage() {
 //  BUILDER ACCORDION SECTION
 // ────────────────────────────────────────
 function _buildAccordion(id, title, subtitle, bodyHtml, saveAction) {
+    // FIX: Tombol simpan dipindah ke DALAM accordion body tapi accordion dibuka otomatis
+    // (style="display:block") agar tombol selalu terlihat dan bisa diklik tanpa perlu
+    // klik header dulu. Arrow juga disesuaikan ke posisi terbuka (▼).
     return `
     <div class="settings-accordion" id="${id}_wrap">
       <div class="settings-accordion-header" onclick="toggleSettingsSection('${id}')">
@@ -177,9 +180,9 @@ function _buildAccordion(id, title, subtitle, bodyHtml, saveAction) {
           <div class="settings-acc-title">${title}</div>
           <div class="settings-acc-sub">${subtitle}</div>
         </div>
-        <span class="settings-acc-arrow" id="${id}_arrow">▶</span>
+        <span class="settings-acc-arrow" id="${id}_arrow">▼</span>
       </div>
-      <div class="settings-accordion-body" id="${id}_body" style="display:none;">
+      <div class="settings-accordion-body" id="${id}_body" style="display:block;">
         <div class="settings-acc-content">
           ${bodyHtml}
         </div>
