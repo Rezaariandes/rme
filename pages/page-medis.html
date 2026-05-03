@@ -109,7 +109,11 @@
                         <div class="col-6"><label class="form-label">Diagnosa Utama</label><input list="list-icd" id="diagnosa" class="form-control" data-save="true" placeholder="Diagnosa..."></div>
                         <div class="col-6"><label class="form-label">Diagnosa 2</label><input list="list-icd" id="diagnosa2" class="form-control" data-save="true" placeholder="Sekunder..."></div>
                     </div>
-                    <div class="form-group">
+                    <!-- ══ RESEP OBAT (tampil jika modul stok aktif) ══ -->
+                    <div id="sectionResep" style="display:none;"></div>
+
+                    <!-- Terapi manual (tampil jika modul stok tidak aktif) -->
+                    <div id="sectionTerapiManual" class="form-group">
                         <label class="form-label">Terapi & Obat</label>
                         <textarea id="terapi" class="form-control" data-save="true" placeholder="Resep dan terapi..." rows="2"></textarea>
                         <button class="stt-btn" onclick="startSTT('terapi')">🎙️</button>
