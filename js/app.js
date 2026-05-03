@@ -31,6 +31,12 @@ function switchPage(id, navEl) {
         }
         if (typeof initLaporan === 'function') initLaporan();
     }
+    if (id === 'pageBiaya') {
+        if (typeof initPageBiaya === 'function') initPageBiaya();
+    }
+    if (id === 'pageStok') {
+        if (typeof initPageStok === 'function') initPageStok();
+    }
     if (id === 'pageSettings') {
         if (typeof loggedInUser !== 'undefined' && loggedInUser) {
             const jabatan = (loggedInUser.jabatan || '').toLowerCase();
@@ -54,6 +60,7 @@ async function loadRuntimeSettings() {
         const s = data.settings;
 
         if (s.klinik_nama)  window.KLINIK_NAMA  = s.klinik_nama;
+        window._settingsFull = s;  // expose for invoice print header
         if (s.klinik_title) window.KLINIK_TITLE = s.klinik_title;
         if (s.jabatan_medis) {
             const jabList = s.jabatan_medis.split(',').map(j => j.trim()).filter(j => j);
@@ -98,6 +105,19 @@ async function loadRuntimeSettings() {
         } else {
             window._labAktif = { lab_gds: true, lab_chol: true, lab_ua: true };
         }
+
+        // Load stok_aktif ke window global
+        window._stokAktif = (s.stok_aktif === '1');
+        if (window._stokAktif && typeof initStokModule === 'function') {
+            initStokModule().catch(() => {});
+        }
+        const _navStok = document.getElementById('navStok');
+        if (_navStok) _navStok.style.display = window._stokAktif ? '' : 'none';
+
+        // Load biaya aktif
+        window._biayaAktif = (s.biaya_aktif === '1');
+        const _navBiaya = document.getElementById('navBiaya');
+        if (_navBiaya) _navBiaya.style.display = window._biayaAktif ? '' : 'none';
 
         // BUG F FIX: Terapkan hak akses modul setelah settings dimuat
         // applyModuleAccess dipanggil di sini (bukan hanya di auth.js) agar

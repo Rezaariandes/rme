@@ -206,6 +206,18 @@ function openModal(index) {
 
     toggleEditModal(false);
 
+    // Invoice button: show if kunjungan has id
+    const invRow = $('viewInvoiceRow');
+    if (invRow) {
+        invRow.style.display = r.id ? '' : 'none';
+        // Store current kunjungan data for invoice lookup
+        window._modalCurrentKunjId  = r.id  || null;
+        window._modalCurrentPasienNama = (typeof allPatients !== 'undefined')
+            ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
+            : '';
+        window._modalCurrentTgl = r.tgl || '';
+    }
+
     const modal = $('modalRiwayat');
     if (modal) modal.classList.add('show');
 }
@@ -219,6 +231,18 @@ function toggleEditModal(isEdit) {
 }
 
 function closeModal() {
+    // Invoice button: show if kunjungan has id
+    const invRow = $('viewInvoiceRow');
+    if (invRow) {
+        invRow.style.display = r.id ? '' : 'none';
+        // Store current kunjungan data for invoice lookup
+        window._modalCurrentKunjId  = r.id  || null;
+        window._modalCurrentPasienNama = (typeof allPatients !== 'undefined')
+            ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
+            : '';
+        window._modalCurrentTgl = r.tgl || '';
+    }
+
     const modal = $('modalRiwayat');
     if (modal) modal.classList.remove('show');
 }
@@ -326,5 +350,17 @@ async function simpanEditModal() {
         showToast("❌ Gagal menyimpan perubahan: " + (e.message || ''), "error");
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = "💾 Simpan Perubahan"; }
+    }
+}
+
+
+// ── Invoice dari modal riwayat ──
+function _viewInvoiceFromModal() {
+    const kunjId    = window._modalCurrentKunjId;
+    const nama      = window._modalCurrentPasienNama;
+    const tgl       = window._modalCurrentTgl;
+    if (!kunjId) return showToast('⚠️ Data kunjungan tidak tersedia', 'error');
+    if (typeof lihatTagihanKunjungan === 'function') {
+        lihatTagihanKunjungan(kunjId, nama, tgl);
     }
 }

@@ -152,6 +152,20 @@ function _renderSettingsPage() {
           'lab'
       )}
 
+      <!-- ═══ SEKSI 3c: STOK OBAT ═══ -->
+      ${_buildAccordion('sec_stok', '💊 Modul Stok Obat',
+          'Aktifkan sistem stok & harga obat terintegrasi di halaman pemeriksaan',
+          _htmlStokSection(),
+          'stok'
+      )}
+
+      <!-- ═══ SEKSI 3d: SISTEM BIAYA ═══ -->
+      \${_buildAccordion('sec_biaya', '🏷️ Sistem Pembiayaan',
+          'Aktifkan tagihan otomatis, invoice, dan manajemen tarif layanan',
+          _htmlBiayaSection(),
+          'biaya'
+      )}
+
       <!-- ═══ SEKSI 4: KONFIGURASI AI ═══ -->
       ${_buildAccordion('sec_ai', '🤖 API Key Kecerdasan Buatan (AI)',
           'Gemini, Groq, OpenRouter, OpenAI, Mistral',
@@ -546,6 +560,8 @@ async function memuatSettings() {
         _renderAiKeys(_settingsCache);
         _initModuleAccess();
         _loadLabAktif(_settingsCache);
+        _loadStokAktif(_settingsCache);
+        _loadBiayaAktif(_settingsCache);
 
         showSettingsBanner("✅ Konfigurasi berhasil dimuat", "success");
         setTimeout(() => hideSettingsBanner(), 2500);
@@ -1021,6 +1037,21 @@ async function simpanSeksi(seksi) {
             if (typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
             showToast("✅ Konfigurasi laboratorium disimpan", "success");
 
+        } else if (seksi === 'biaya') {
+            const aktif = !!document.getElementById('cfg_biaya_aktif')?.checked;
+            await sb_saveSettings({ biaya_aktif: aktif ? '1' : '0' });
+            window._biayaAktif = aktif;
+            _applyBiayaAktif(aktif);
+            showToast('✅ Pengaturan pembiayaan disimpan', 'success');
+
+        } else if (seksi === 'stok') {
+            const aktif = !!document.getElementById('cfg_stok_aktif')?.checked;
+            await sb_saveSettings({ stok_aktif: aktif ? '1' : '0' });
+            window._stokAktif = aktif;
+            // Toggle nav stok & section resep
+            _applyStokAktif(aktif);
+            showToast('✅ Pengaturan stok obat disimpan', 'success');
+
         } else if (seksi === 'integrasi') {
             const payload = {
                 ocr_api_key:      _getVal('cfg_ocr_api_key'),
@@ -1090,6 +1121,8 @@ async function simpanSemuaSettings() {
         ss_client_secret: _getVal('cfg_ss_client_secret'),
         module_access:    JSON.stringify(_moduleAccess),
         lab_aktif:        _getLabAktifPayload(),
+        stok_aktif:       document.getElementById('cfg_stok_aktif')?.checked ? '1' : '0',
+        biaya_aktif:      document.getElementById('cfg_biaya_aktif')?.checked ? '1' : '0',
         dokter:           JSON.stringify(dokterPayload),
         ...aiKeysPayload
     };
@@ -1551,4 +1584,245 @@ function escHtml(str) {
         .replace(/"/g,'&quot;')
         .replace(/</g,'&lt;')
         .replace(/>/g,'&gt;');
+}
+
+
+// ════════════════════════════════════════
+//  STOK OBAT — SETTINGS
+// ════════════════════════════════════════
+function _htmlStokSection() {
+    return `
+    <div style="padding:4px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:12px;margin-bottom:10px;">
+            <div>
+                <div style="font-weight:700;font-size:13px;color:var(--primary-dark);">💊 Aktifkan Modul Stok Obat</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Tampilkan halaman Stok & picker resep otomatis di pemeriksaan medis</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;">
+                <input type="checkbox" id="cfg_stok_aktif" style="opacity:0;width:0;height:0;"
+                    onchange="_previewStokToggle(this.checked)">
+                <span id="stok_toggle_thumb" style="position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:26px;transition:.3s;">
+                    <span style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></span>
+                </span>
+            </label>
+        </div>
+
+        <div style="background:#f8fafc;border-radius:10px;padding:12px;font-size:11.5px;color:var(--text-muted);line-height:1.7;">
+            <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Ketika diaktifkan:</div>
+            <div>✅ Menu <b>STOK</b> muncul di navigasi bawah</div>
+            <div>✅ Form resep obat otomatis muncul di halaman pemeriksaan</div>
+            <div>✅ Frekuensi penggunaan terisi otomatis dari data obat</div>
+            <div>✅ Stok berkurang otomatis saat resep disimpan</div>
+            <div>✅ Kolom <b>Terapi & Obat</b> manual tetap tersedia sebagai fallback</div>
+            <div style="margin-top:8px;">Ketika dimatikan:</div>
+            <div>↩️ Kembali ke kolom Terapi & Obat teks biasa</div>
+        </div>
+
+        <div style="margin-top:12px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:10px;padding:10px;font-size:11px;color:#92400e;">
+            ⚠️ <b>SQL yang diperlukan di Supabase</b> — Jalankan skrip DDL di bawah ini satu kali di SQL Editor Supabase sebelum mengaktifkan modul ini.
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-weight:700;color:var(--primary);">Lihat SQL DDL ▼</summary>
+                <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:10px;overflow-x:auto;margin-top:8px;white-space:pre-wrap;">-- Tabel master obat
+CREATE TABLE IF NOT EXISTS obat (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nama               TEXT NOT NULL,
+  kategori           TEXT DEFAULT 'Umum',
+  satuan             TEXT DEFAULT 'tablet',
+  harga_beli         NUMERIC(12,2) DEFAULT 0,
+  harga_jual         NUMERIC(12,2) DEFAULT 0,
+  stok               INTEGER DEFAULT 0,
+  stok_minimum       INTEGER DEFAULT 5,
+  frekuensi_default  TEXT DEFAULT '3x1',
+  keterangan         TEXT,
+  created_at         TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabel item resep per kunjungan
+CREATE TABLE IF NOT EXISTS resep_item (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kunjungan_id UUID NOT NULL REFERENCES kunjungan(id) ON DELETE CASCADE,
+  obat_id      UUID REFERENCES obat(id) ON DELETE SET NULL,
+  nama_obat    TEXT NOT NULL,
+  jumlah       INTEGER NOT NULL DEFAULT 1,
+  frekuensi    TEXT DEFAULT '3x1',
+  catatan      TEXT,
+  harga_satuan NUMERIC(12,2) DEFAULT 0,
+  subtotal     NUMERIC(14,2) DEFAULT 0,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index untuk performa
+CREATE INDEX IF NOT EXISTS idx_resep_kunjungan ON resep_item(kunjungan_id);
+
+-- RPC untuk kurangi stok (atomic)
+CREATE OR REPLACE FUNCTION kurangi_stok_obat(p_obat_id UUID, p_jumlah INTEGER)
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE obat SET stok = GREATEST(0, stok - p_jumlah) WHERE id = p_obat_id;
+END;
+$$;
+
+-- RLS Policies (sesuaikan dengan auth setup Anda)
+ALTER TABLE obat ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resep_item ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_obat" ON obat FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_resep" ON resep_item FOR ALL USING (true) WITH CHECK (true);</pre>
+            </details>
+        </div>
+    </div>`;
+}
+
+function _loadStokAktif(s) {
+    const aktif = s.stok_aktif === '1';
+    window._stokAktif = aktif;
+    const chk = document.getElementById('cfg_stok_aktif');
+    if (chk) {
+        chk.checked = aktif;
+        _updateStokToggleStyle(aktif);
+    }
+    _applyStokAktif(aktif);
+}
+
+function _previewStokToggle(aktif) {
+    _updateStokToggleStyle(aktif);
+}
+
+function _updateStokToggleStyle(aktif) {
+    const thumb = document.getElementById('stok_toggle_thumb');
+    if (!thumb) return;
+    thumb.style.background = aktif ? 'var(--primary)' : '#cbd5e1';
+    const ball = thumb.querySelector('span');
+    if (ball) ball.style.transform = aktif ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function _applyStokAktif(aktif) {
+    // Toggle nav item stok
+    const navStok = document.getElementById('navStok');
+    if (navStok) navStok.style.display = aktif ? '' : 'none';
+
+    // Toggle section resep vs terapi manual di page-medis
+    const secResep  = document.getElementById('sectionResep');
+    const secManual = document.getElementById('sectionTerapiManual');
+    if (secResep)  secResep.style.display  = aktif ? ''     : 'none';
+    if (secManual) secManual.style.display = aktif ? 'none' : '';
+
+    window._stokAktif = aktif;
+    if (aktif && typeof initStokModule === 'function') initStokModule();
+}
+
+
+// ════════════════════════════════════════
+//  SISTEM BIAYA — SETTINGS
+// ════════════════════════════════════════
+function _htmlBiayaSection() {
+    return `
+    <div style="padding:4px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(5,150,105,0.06);border:1px solid rgba(5,150,105,0.18);border-radius:12px;margin-bottom:10px;">
+            <div>
+                <div style="font-weight:700;font-size:13px;color:var(--primary-dark);">🏷️ Aktifkan Sistem Pembiayaan</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Tagihan otomatis, invoice & print setelah selesai periksa</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;">
+                <input type="checkbox" id="cfg_biaya_aktif" style="opacity:0;width:0;height:0;"
+                    onchange="_previewBiayaToggle(this.checked)">
+                <span id="biaya_toggle_thumb" style="position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:26px;transition:.3s;">
+                    <span style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></span>
+                </span>
+            </label>
+        </div>
+
+        <div style="background:#f8fafc;border-radius:10px;padding:12px;font-size:11.5px;color:var(--text-muted);line-height:1.7;margin-bottom:10px;">
+            <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Ketika diaktifkan:</div>
+            <div>✅ Menu <b>TARIF</b> muncul di navigasi untuk input tarif layanan</div>
+            <div>✅ Tagihan <b>otomatis muncul</b> setelah rekam medis disimpan</div>
+            <div>✅ Biaya dihitung dari: Vital Sign, Konsultasi, Lab, Obat, Surat Ket.</div>
+            <div>✅ Bisa tambah/hapus item & beri diskon sebelum simpan</div>
+            <div>✅ Invoice bisa dilihat & di-print dari riwayat kunjungan</div>
+            <div>✅ Laporan keuangan tersedia di halaman Laporan</div>
+        </div>
+
+        <div style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:10px;padding:10px;font-size:11px;color:#92400e;">
+            ⚠️ <b>SQL yang diperlukan di Supabase</b> — Jalankan satu kali sebelum mengaktifkan.
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-weight:700;color:var(--primary);">Lihat SQL DDL ▼</summary>
+                <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:10px;overflow-x:auto;margin-top:8px;white-space:pre-wrap;">-- Tabel master tarif layanan
+CREATE TABLE IF NOT EXISTS tarif_layanan (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nama        TEXT NOT NULL,
+  kategori    TEXT DEFAULT 'Pemeriksaan',
+  harga       NUMERIC(12,2) DEFAULT 0,
+  keterangan  TEXT,
+  aktif       BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabel tagihan per kunjungan
+CREATE TABLE IF NOT EXISTS tagihan (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kunjungan_id UUID NOT NULL REFERENCES kunjungan(id) ON DELETE CASCADE,
+  pasien_id    UUID REFERENCES pasien(id) ON DELETE SET NULL,
+  subtotal     NUMERIC(14,2) DEFAULT 0,
+  diskon       NUMERIC(14,2) DEFAULT 0,
+  total        NUMERIC(14,2) DEFAULT 0,
+  status       TEXT DEFAULT 'Lunas',
+  catatan      TEXT,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabel item tagihan
+CREATE TABLE IF NOT EXISTS tagihan_item (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tagihan_id   UUID NOT NULL REFERENCES tagihan(id) ON DELETE CASCADE,
+  nama_item    TEXT NOT NULL,
+  kategori     TEXT DEFAULT 'Layanan',
+  jumlah       INTEGER DEFAULT 1,
+  harga_satuan NUMERIC(12,2) DEFAULT 0,
+  subtotal     NUMERIC(14,2) DEFAULT 0,
+  keterangan   TEXT,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index
+CREATE INDEX IF NOT EXISTS idx_tagihan_kunjungan ON tagihan(kunjungan_id);
+CREATE INDEX IF NOT EXISTS idx_tagihan_item ON tagihan_item(tagihan_id);
+
+-- RLS
+ALTER TABLE tarif_layanan ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tagihan        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tagihan_item   ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_tarif"   ON tarif_layanan FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_tagihan" ON tagihan        FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_tagitem" ON tagihan_item   FOR ALL USING (true) WITH CHECK (true);</pre>
+            </details>
+        </div>
+    </div>`;
+}
+
+function _loadBiayaAktif(s) {
+    const aktif = s.biaya_aktif === '1';
+    window._biayaAktif = aktif;
+    const chk = document.getElementById('cfg_biaya_aktif');
+    if (chk) {
+        chk.checked = aktif;
+        _updateBiayaToggleStyle(aktif);
+    }
+    _applyBiayaAktif(aktif);
+}
+
+function _previewBiayaToggle(aktif) {
+    _updateBiayaToggleStyle(aktif);
+}
+
+function _updateBiayaToggleStyle(aktif) {
+    const thumb = document.getElementById('biaya_toggle_thumb');
+    if (!thumb) return;
+    thumb.style.background = aktif ? '#059669' : '#cbd5e1';
+    const ball = thumb.querySelector('span');
+    if (ball) ball.style.transform = aktif ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function _applyBiayaAktif(aktif) {
+    const navBiaya = document.getElementById('navBiaya');
+    if (navBiaya) navBiaya.style.display = aktif ? '' : 'none';
+    window._biayaAktif = aktif;
 }

@@ -323,6 +323,11 @@ async function saveAll() {
                 currentKunjunganId = result.kunjunganId;
             }
 
+            // Simpan & kurangi stok resep jika modul aktif
+            if (window._stokAktif && typeof simpanResepKunjungan === 'function') {
+                await simpanResepKunjungan(currentKunjunganId).catch(() => {});
+            }
+
             // BUG FIX: Update status di array lokal secara optimistis
             // agar tampilan Kunjungan Hari Ini langsung berubah tanpa menunggu refetch
             if (isSelesai && currentKunjunganId) {
@@ -333,7 +338,21 @@ async function saveAll() {
             if (isSelesai) {
                 showToast("✅ Rekam medis selesai & tersimpan!", "success");
                 if (btn) btn.innerText = "✓ Tersimpan!";
+                if (typeof resetResepSession === 'function') resetResepSession();
                 clearSession();
+
+                // Buka modal tagihan otomatis setelah simpan selesai
+                if (window._biayaAktif && typeof openModalTagihan === 'function') {
+                    const _pasienNama = $('nama') ? $('nama').value : '';
+                    openModalTagihan(
+                        currentKunjunganId,
+                        currentPasienId,
+                        _pasienNama,
+                        payload.localDate,
+                        payload
+                    ).catch(() => {});
+                }
+
                 setTimeout(() => {
                     currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
                     ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
@@ -371,7 +390,10 @@ function renderRiwayatList(riwayatArr, containerId) {
                 <div class="riwayat-item" onclick="openModal(${i})">
                     <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                         <div class="riwayat-date">📅 ${r.tgl ? formatTglIndo(r.tgl) : '-'} <span style="color:var(--text-muted); font-weight:normal;">${r.waktu ? '(' + r.waktu + ')' : ''}</span></div>
+                        <div style="display:flex;gap:6px;align-items:center;">
                         <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
+                        ${r.id ? `<button onclick="event.stopPropagation();lihatTagihanKunjungan('${r.id}','${(r.namaPasien||'').replace(/'/g,'')}',' ${r.tgl||''}')" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
+                    </div>
                     </div>
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
                         <b>TTV:</b> TD ${r.td||'-'} | N ${r.nadi||'-'} | S ${r.suhu||'-'} | RR ${r.rr||'-'} | BB ${r.bb||'-'}
@@ -430,6 +452,15 @@ const LAB_GROUP_LABELS = {
 function _renderSectionLabDinamic() {
     const section = $('sectionLab');
     if (!section) return;
+
+    // Render resep section jika modul stok aktif
+    if (window._stokAktif && typeof renderSectionResep === 'function') {
+        renderSectionResep(currentKunjunganId || null);
+        const secResep  = document.getElementById('sectionResep');
+        const secManual = document.getElementById('sectionTerapiManual');
+        if (secResep)  secResep.style.display  = '';
+        if (secManual) secManual.style.display = 'none';
+    }
 
     const labAktif = window._labAktif || { lab_gds: true, lab_chol: true, lab_ua: true };
     const activeFields = ALL_LAB_FIELDS.filter(f => labAktif[f.id]);
