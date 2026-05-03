@@ -8,11 +8,15 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Jabatan</label>
+                    <!-- Diisi dinamis oleh renderJabatanSelect() dari user.js saat halaman dibuka -->
                     <select id="u_jabatan" class="form-control">
+                        <option value="Dokter">Dokter</option>
                         <option value="Admin">Admin</option>
                         <option value="Paramedis">Paramedis</option>
-                        <option value="Dokter">Dokter</option>
                     </select>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+                        💡 User dengan jabatan <strong>Dokter</strong> akan otomatis tercatat sebagai dokter pemeriksa di setiap kunjungan pasien (untuk integrasi Satu Sehat).
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">PIN (6 Digit)</label>
