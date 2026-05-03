@@ -71,12 +71,7 @@ async function sb_saveSettings(payload) {
             prefer: 'return=minimal'
         });
         if (dokterList.length > 0) {
-            await _sbFetch('dokter', { method: 'POST', body: dokterList.map(d => ({
-                nama: d.nama, jabatan: d.jabatan, nik: d.nik || null,
-                ihs: d.ihs || null, sip: d.sip || null,
-                spesialis: d.spesialis || null,
-                user_id: d.user_id || null
-            })), prefer: 'return=minimal' });
+            await _sbFetch('dokter', { method: 'POST', body: dokterList, prefer: 'return=minimal' });
         }
     }
     return { status: 'success' };
@@ -129,19 +124,28 @@ async function _sha256(text) {
 //  PASIEN
 // ═══════════════════════════════════════
 async function sb_initData(filterDate) {
-    const [pasien, kunjungan] = await Promise.all([
+    const [pasien, kunjungan, users] = await Promise.all([
         _sbFetch('pasien?select=id,nama,nik,jk,tgl_lahir,alamat&order=nama.asc'),
-        _sbFetch(`kunjungan?tgl=eq.${filterDate}&select=*&order=waktu.asc`)
+        _sbFetch(`kunjungan?tgl=eq.${filterDate}&select=*&order=waktu.asc`),
+        _sbFetch('users?select=id,nama,jabatan&order=nama.asc')
     ]);
+
+    // Simpan ke window global agar modul lain bisa resolve nama dokter
+    window._usersCache = users || [];
 
     const hariIni = kunjungan.map(k => {
         const p = pasien.find(p => p.id === k.pasien_id) || {};
+        const dokterUser = k.user_id ? users.find(u => u.id === k.user_id) : null;
+        const dokterNama = (dokterUser && dokterUser.jabatan &&
+                           dokterUser.jabatan.toLowerCase() === 'dokter')
+                          ? dokterUser.nama : null;
         return {
             id: k.id, pasienId: k.pasien_id,
             nama: p.nama || '', waktu: k.waktu, tgl: k.tgl,
             td: k.td, suhu: k.suhu, keluhan: k.keluhan,
             diag: k.diagnosa, status: k.status || 'Menunggu',
-            user_id: k.user_id || null
+            user_id: k.user_id || null,
+            dokterNama
         };
     });
 
@@ -212,6 +216,7 @@ async function sb_checkAndUpsertPasien(payload) {
     const _mapKunjungan = r => ({
         id: r.id, tgl: r.tgl, waktu: r.waktu,
         user_id: r.user_id || null,
+        dokterNama: _resolveDokterNama(r.user_id),
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
         // Lab dasar
@@ -266,6 +271,16 @@ async function sb_savePasienOnly(payload) {
 //  KUNJUNGAN
 // ═══════════════════════════════════════
 
+// ── Helper: resolve nama dokter pemeriksa dari user_id → window._usersCache ──
+// Mengembalikan nama dokter (string) jika user jabatan=Dokter, null jika bukan
+function _resolveDokterNama(userId) {
+    if (!userId) return null;
+    const users = window._usersCache || [];
+    const u = users.find(u => u.id === userId);
+    if (!u) return null;
+    return (u.jabatan && u.jabatan.toLowerCase() === 'dokter') ? u.nama : null;
+}
+
 // ── Ambil satu kunjungan lengkap by ID (untuk populate form pemeriksaan) ──
 async function sb_getKunjunganById(kunjunganId) {
     const rows = await _sbFetch(`kunjungan?id=eq.${kunjunganId}&select=*&limit=1`);
@@ -274,6 +289,7 @@ async function sb_getKunjunganById(kunjunganId) {
     return {
         id: r.id, pasien_id: r.pasien_id, tgl: r.tgl, waktu: r.waktu,
         user_id: r.user_id || null,
+        dokterNama: _resolveDokterNama(r.user_id),
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
         // Lab dasar
@@ -331,7 +347,7 @@ async function sb_saveKunjungan(payload) {
     const isSelesai = diagnosa && terapi;
     const body = {
         pasien_id: pasienId, tgl: localDate, waktu: localTime,
-        user_id: payload.userId || null,
+        user_id: userId || null,
         td: td || null,
         nadi:     _num(nadi),
         rr:       _num(rr),

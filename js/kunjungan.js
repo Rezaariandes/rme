@@ -81,24 +81,15 @@ function renderKunjunganHariIni() {
         return String(a.waktu || "00:00").localeCompare(String(b.waktu || "00:00"));
     });
 
-    // Helper: resolve nama dokter pemeriksa dari user_id di window._dokterAktif
-    function _getDokterPemeriksa(userId) {
-        if (!userId) return null;
-        const dokterList = window._dokterAktif || [];
-        const d = dokterList.find(dk => dk.user_id && String(dk.user_id) === String(userId));
-        return d ? d.nama : null;
-    }
-
     container.innerHTML = sorted.map(h => {
         const isDone    = h.status === 'Selesai';
         const diagRow   = window._isParamedis ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
-        // Nama dokter pemeriksa (dari relasi user_id → tabel dokter)
-        const dokterNama = _getDokterPemeriksa(h.user_id);
-        const dokterRow  = dokterNama
-            ? `<div style="font-size:10px;color:var(--primary);font-weight:600;margin-top:2px;">👨‍⚕️ ${dokterNama}</div>`
-            : '';
         // FIX: Jika h.nama kosong (join gagal di sb_initData), cari dari allPatients
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
+        // Tampilkan nama dokter pemeriksa jika ada (sudah di-resolve di sb_initData)
+        const dokterRow = h.dokterNama
+            ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:2px;">👨‍⚕️ dr. ${h.dokterNama}</div>`
+            : '';
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.62' : '1'};" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div class="visit-time-badge">${h.waktu || '-'}</div>
@@ -252,8 +243,9 @@ async function saveAll() {
         kunjunganId: currentKunjunganId || "",
         localDate:   localDateStr,
         localTime:   localTimeStr,
-        // Sertakan user_id dokter yang sedang login agar kunjungan tercatat ke dokter pemeriksa
-        userId: (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : null,
+        // Simpan user_id dokter yang sedang login — dipakai untuk info dokter pemeriksa (Satu Sehat)
+        userId: (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id)
+                ? loggedInUser.id : null,
         nik:      $('nik')      ? $('nik').value      : '',
         nama:     $('nama')     ? $('nama').value     : '',
         tgl_lahir: $('tgl_lahir') ? $('tgl_lahir').value : '',
@@ -366,6 +358,7 @@ function renderRiwayatList(riwayatArr, containerId) {
                     ${window._isParamedis ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
                     <div class="riwayat-keluhan" style="color:var(--text); border-top:1px dashed var(--border); padding-top:4px; margin-bottom:3px;"><b>Keluhan:</b> ${r.keluhan || '-'}</div>
                     <div class="riwayat-keluhan" style="color:var(--text);"><b>Terapi:</b> ${r.terapi || '-'}</div>
+                    ${r.dokterNama ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);">👨‍⚕️ Diperiksa oleh: ${r.dokterNama}</div>` : ''}
                 </div>
             `).join('');
     } else {

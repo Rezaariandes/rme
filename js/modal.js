@@ -27,6 +27,18 @@ function openModal(index) {
     if ($('viewDiag'))   $('viewDiag').innerText   = r.diag   || '-';
     if ($('viewTerapi')) $('viewTerapi').innerText  = r.terapi || '-';
 
+    // Dokter pemeriksa — dari field dokterNama yang di-resolve oleh supabase.js
+    const dokterRow = $('viewDokterRow');
+    const dokterEl  = $('viewDokterPemeriksa');
+    if (dokterEl && dokterRow) {
+        if (r.dokterNama) {
+            dokterEl.innerText      = r.dokterNama;
+            dokterRow.style.display = '';
+        } else {
+            dokterRow.style.display = 'none';
+        }
+    }
+
     if ($('modalTanggalInfoEdit'))
         $('modalTanggalInfoEdit').innerText =
             "✏️ Edit: " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
