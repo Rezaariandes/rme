@@ -306,6 +306,17 @@ async function simpanEditModal() {
             diag:     payload.diagnosa, terapi:   payload.terapi
         });
 
+        // BUG-08 FIX: Update status ke "Selesai" jika diagnosa & terapi sudah diisi,
+        // baik di cache riwayat maupun di array kunjunganHariIni.
+        const isSelesai = !!(payload.diagnosa && payload.terapi);
+        if (isSelesai) {
+            r.status = 'Selesai';
+            if (typeof kunjunganHariIni !== 'undefined') {
+                const kIdx = kunjunganHariIni.findIndex(x => x.id === r.id);
+                if (kIdx !== -1) kunjunganHariIni[kIdx].status = 'Selesai';
+            }
+        }
+
         renderRiwayatList(currentRiwayat, 'historyListMedis');
         if ($('riwayatDaftarContainer'))
             renderRiwayatList(currentRiwayat, 'riwayatDaftarContainer');

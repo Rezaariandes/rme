@@ -117,6 +117,16 @@ async function sb_saveUser(payload) {
     }
 }
 
+// ── HAPUS USER PERMANEN ──
+// BUG-01 FIX: Fungsi ini sebelumnya tidak ada, menyebabkan tombol hapus user selalu error.
+async function sb_deleteUser(userId) {
+    await _sbFetch(`users?id=eq.${userId}`, {
+        method: 'DELETE',
+        prefer: 'return=minimal'
+    });
+    return { status: 'success' };
+}
+
 // ── TAMBAH DOKTER DARI REGISTRASI USER BARU ──
 // Dipanggil oleh user.js saat user baru dengan jabatan Dokter berhasil dibuat.
 // Fungsi ini menambahkan entri ke tabel dokter dengan user_id terhubung
@@ -188,10 +198,12 @@ async function sb_checkAndUpsertPasien(payload) {
         if (rows.length) pasienRow = rows[0];
     }
     if (!pasienRow) {
-        // BUG G FIX: encodeURIComponent benar untuk spasi (%20) tapi karakter & dalam nama
-        // harus di-encode agar tidak break query string. encodeURIComponent sudah handle ini
-        // (& → %26), jadi tetap pakai encodeURIComponent namun pastikan nama di-trim dulu.
-        const namaEncoded = encodeURIComponent((nama || '').trim());
+        // BUG-10 FIX: Nama pasien dengan karakter & # ? bisa menyebabkan Supabase
+        // misparsing query. Trim dulu, lalu encodeURIComponent untuk encode semua karakter
+        // khusus (& → %26, # → %23, ? → %3F, + → %2B).
+        // NIK sudah dicoba di atas dan tidak ketemu — ini fallback terakhir.
+        const namaTrim    = (nama || '').trim();
+        const namaEncoded = encodeURIComponent(namaTrim);
         const rows = await _sbFetch(`pasien?nama=eq.${namaEncoded}&limit=1`);
         if (rows.length) pasienRow = rows[0];
     }
@@ -211,27 +223,44 @@ async function sb_checkAndUpsertPasien(payload) {
     }
 
     // ── Ambil atau buat kunjungan hari ini ──
+    // BUG-03 FIX: Sebelumnya pakai GET dulu lalu POST — rentan duplikat jika tombol
+    // diklik dua kali sebelum respons pertama datang. Sekarang pakai UPSERT dengan
+    // resolution=ignore-duplicates sehingga insert kedua diabaikan oleh Supabase.
+    // Pastikan tabel kunjungan punya UNIQUE constraint pada (pasien_id, tgl).
     let kunjunganHariIni = null;
     if (createVisitToday && localDate) {
-        const existing = await _sbFetch(
-            `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
-        );
-        if (existing.length > 0) {
-            // Kunjungan sudah ada — gunakan data yang ada (jangan buat baru)
-            kunjunganHariIni = existing[0];
+        const upserted = await _sbFetch('kunjungan', {
+            method: 'POST',
+            body: { pasien_id: pasienRow.id, tgl: localDate, waktu: localTime || '00:00', status: 'Menunggu' },
+            prefer: 'resolution=ignore-duplicates,return=representation'
+        });
+        if (upserted && upserted[0]) {
+            kunjunganHariIni = upserted[0];
         } else {
-            // Belum ada — buat baru
-            const inserted = await _sbFetch('kunjungan', {
-                method: 'POST',
-                body: { pasien_id: pasienRow.id, tgl: localDate, waktu: localTime||'00:00', status: 'Menunggu' }
-            });
-            kunjunganHariIni = inserted[0];
+            // Jika baris sudah ada (ignore-duplicates mengembalikan array kosong), fetch manual
+            const existing = await _sbFetch(
+                `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
+            );
+            kunjunganHariIni = existing[0] || null;
         }
     }
 
     const riwayat = await _sbFetch(
         `kunjungan?pasien_id=eq.${pasienRow.id}&order=tgl.desc,waktu.desc&select=*`
     );
+
+    // BUG-04 FIX: _mapKunjungan memanggil _resolveDokterNama() yang bergantung pada
+    // window._usersCache. Jika sb_checkAndUpsertPasien dipanggil sebelum sb_initData
+    // (misalnya saat reload pageMedis), cache kosong dan dokterNama selalu null.
+    // Solusi: isi cache dari server jika belum terisi.
+    if (!window._usersCache || window._usersCache.length === 0) {
+        try {
+            const users = await _sbFetch('users?select=id,nama,jabatan&order=nama.asc');
+            window._usersCache = users || [];
+        } catch(e) {
+            window._usersCache = [];
+        }
+    }
 
     // Mapper helper agar konsisten
     const _mapKunjungan = r => ({

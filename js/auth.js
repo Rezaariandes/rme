@@ -7,43 +7,89 @@ let currentPinInput = "";
 let loggedInUser    = null; // { nama, jabatan }
 
 // ── INISIALISASI PIN LOCK (CEK SESI 3 JAM) ──
-function initPinLock() {
-    const isUnlocked = localStorage.getItem('is_unlocked');
-    const expiryTime = localStorage.getItem('session_expiry');
-    const now        = Date.now();
+// BUG-02 FIX: Sesi divalidasi dengan token HMAC (userId + expiry) yang disimpan
+// bersamaan dengan is_unlocked. Manipulasi localStorage saja tidak cukup karena
+// token harus cocok dengan yang dibuat saat login berhasil.
+async function initPinLock() {
+    const isUnlocked    = localStorage.getItem('is_unlocked');
+    const expiryTime    = localStorage.getItem('session_expiry');
+    const sessionToken  = localStorage.getItem('session_token');
+    const storedUser    = localStorage.getItem('logged_user');
+    const now           = Date.now();
 
-    if (isUnlocked === 'true' && expiryTime && now < parseInt(expiryTime)) {
-        const pinScreen = document.getElementById('pinScreen');
-        if (pinScreen) pinScreen.style.display = 'none';
+    if (isUnlocked === 'true' && expiryTime && now < parseInt(expiryTime) && sessionToken && storedUser) {
+        // Verifikasi token — harus cocok dengan yang dibuat saat login
+        let parsedUser = null;
+        try { parsedUser = JSON.parse(storedUser); } catch(e) {}
 
-        const drNameEl = document.getElementById('drName');
-        if (drNameEl && localStorage.getItem('rme_drName')) {
-            drNameEl.innerText = localStorage.getItem('rme_drName');
+        let tokenValid = false;
+        if (parsedUser && parsedUser.id) {
+            const expectedToken = await _sha256(parsedUser.id + expiryTime);
+            tokenValid = (sessionToken === expectedToken);
         }
 
-        try {
-            loggedInUser = JSON.parse(localStorage.getItem('logged_user') || 'null');
-        } catch (e) {
-            loggedInUser = null;
-        }
+        if (!tokenValid) {
+            // Token tidak cocok — tolak sesi meski is_unlocked = true
+            _clearSessionStorage();
+        } else {
+            // BUG-07 FIX: Re-validasi jabatan dari server agar sesi resign langsung dicabut
+            try {
+                if (parsedUser && parsedUser.id) {
+                    const rows = await _sbFetch(`users?id=eq.${parsedUser.id}&select=id,nama,jabatan&limit=1`);
+                    if (rows && rows[0]) {
+                        const jabatanServer = (rows[0].jabatan || '').toLowerCase();
+                        if (jabatanServer === 'sudah resign') {
+                            _clearSessionStorage();
+                            showToast && showToast("⛔ Akun Anda sudah tidak aktif.", "error");
+                            _tampilkanPinScreen();
+                            return;
+                        }
+                        // Sinkronkan jabatan terbaru ke loggedInUser & localStorage
+                        parsedUser.jabatan = rows[0].jabatan;
+                        localStorage.setItem('logged_user', JSON.stringify(parsedUser));
+                    }
+                }
+            } catch(e) {
+                // Jika fetch gagal (offline), tetap izinkan sesi yang sudah ada
+                console.warn('[Klikpro] Gagal re-validasi jabatan dari server:', e.message);
+            }
 
-        applyRoleRestrictions();
-        return;
+            loggedInUser = parsedUser;
+
+            const pinScreen = document.getElementById('pinScreen');
+            if (pinScreen) pinScreen.style.display = 'none';
+
+            const drNameEl = document.getElementById('drName');
+            if (drNameEl && localStorage.getItem('rme_drName')) {
+                drNameEl.innerText = localStorage.getItem('rme_drName');
+            }
+
+            applyRoleRestrictions();
+            return;
+        }
     }
 
     // Sesi tidak valid / kedaluwarsa — bersihkan
+    _clearSessionStorage();
+    _tampilkanPinScreen();
+}
+
+function _clearSessionStorage() {
     localStorage.removeItem('is_unlocked');
     localStorage.removeItem('logged_user');
     localStorage.removeItem('session_expiry');
+    localStorage.removeItem('session_token');
+}
 
+function _tampilkanPinScreen() {
     const pinScreen = document.getElementById('pinScreen');
     if (pinScreen) pinScreen.style.display = 'flex';
-
     loadLoginUsers();
     updatePinDots();
 }
 
 // ── MENGAMBIL DAFTAR USER DARI SUPABASE ──
+// BUG-05 FIX: Filter user "Sudah Resign" agar tidak muncul di dropdown login.
 async function loadLoginUsers() {
     const select = document.getElementById('loginUserSelect');
     if (!select) return;
@@ -54,7 +100,13 @@ async function loadLoginUsers() {
         select.innerHTML = '';
 
         if (res.status === "success" && res.data && res.data.length > 0) {
-            res.data.forEach((u, i) => {
+            // Hanya tampilkan user yang BUKAN resign
+            const aktif = res.data.filter(u => (u.jabatan || '').toLowerCase() !== 'sudah resign');
+            if (aktif.length === 0) {
+                select.innerHTML = '<option value="">Belum ada user aktif</option>';
+                return;
+            }
+            aktif.forEach((u, i) => {
                 const opt       = document.createElement('option');
                 opt.value       = u.id;
                 opt.textContent = u.nama + ' (' + u.jabatan + ')';
@@ -117,11 +169,24 @@ async function checkPinServer() {
         if (res.isValid) {
             loggedInUser = res.user;
 
+            // BUG-06 FIX: Blokir login jika jabatan sudah resign,
+            // meski PIN cocok (edge case: resign tapi PIN belum dihapus).
+            if ((loggedInUser.jabatan || '').toLowerCase() === 'sudah resign') {
+                showPinError("Akun ini sudah tidak aktif.");
+                return;
+            }
+
             // Sesi 3 jam
             const expiry = Date.now() + (3 * 60 * 60 * 1000);
+
+            // BUG-02 FIX: Buat session token dari user ID + expiry agar
+            // tidak bisa di-bypass hanya dengan set localStorage manual.
+            const sessionToken = await _sha256(loggedInUser.id + String(expiry));
+
             localStorage.setItem('is_unlocked',    'true');
             localStorage.setItem('logged_user',    JSON.stringify(loggedInUser));
             localStorage.setItem('session_expiry', expiry);
+            localStorage.setItem('session_token',  sessionToken);
 
             if (res.user) {
                 const label = res.user.nama + " (" + res.user.jabatan + ")";

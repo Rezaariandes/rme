@@ -47,9 +47,27 @@ function validasiNilaiVital() {
 }
 
 // ── AMBIL DATA KUNJUNGAN BERDASARKAN TANGGAL ──
+// BUG-12 FIX: Validasi tanggal — tidak boleh memilih tanggal masa depan.
+// Juga set atribut max pada input agar date picker mobile ikut terbatas.
 async function fetchByDate() {
     const filterEl = $('filterDate');
     if (!filterEl || !filterEl.value) return;
+
+    // Hitung tanggal hari ini (lokal)
+    const today     = new Date();
+    const tzOffset  = today.getTimezoneOffset() * 60000;
+    const localToday = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
+
+    // Pasang batas max pada input
+    filterEl.max = localToday;
+
+    // Tolak jika memilih tanggal masa depan
+    if (filterEl.value > localToday) {
+        showToast("⚠️ Tidak bisa melihat data tanggal masa depan", "warning");
+        filterEl.value = localToday;
+        return;
+    }
+
     const listEl = $('listHariIni');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data...</div>`;
     try {

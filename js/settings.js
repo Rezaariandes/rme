@@ -931,10 +931,16 @@ function hapusAiKey(provider, idx) {
     _renderAiKeyRows(provider);
 }
 
+// BUG-09 FIX: Sebelumnya updateAiKey memanggil _renderAiKeyRows() setiap ketik,
+// yang me-render ulang seluruh container → kursor loncat ke awal & performa buruk di HP.
+// Sekarang hanya update nilai di array dan dot status, tanpa re-render DOM.
 function updateAiKey(provider, idx, val) {
     if (!window[`_aiKeys_${provider}`]) window[`_aiKeys_${provider}`] = [];
     window[`_aiKeys_${provider}`][idx] = val;
-    _renderAiKeyRows(provider);
+    // Update hanya dot status, TIDAK memanggil _renderAiKeyRows()
+    const hasKey = window[`_aiKeys_${provider}`].some(k => k && k.trim());
+    const dot = $(`${provider}_status`);
+    if (dot) dot.className = 'ai-status-dot' + (hasKey ? ' has-key' : '');
 }
 
 function toggleAiSection(provider) {
@@ -1173,8 +1179,11 @@ async function testKoneksiSatuSehat() {
 // ════════════════════════════════════════
 //  INJECT STYLE ACCORDION (sekali saja)
 // ════════════════════════════════════════
+// BUG-11 FIX: Gunakan querySelector dengan ID selector untuk memastikan pengecekan
+// duplikat berfungsi. document.getElementById() tidak menangani ID dengan tanda hubung
+// melalui shortcut $() di beberapa implementasi — querySelector lebih aman.
 function _injectAccordionStyle() {
-    if ($('settings-accordion-style')) return;
+    if (document.querySelector('#settings-accordion-style')) return;
     const style = document.createElement('style');
     style.id = 'settings-accordion-style';
     style.textContent = `
