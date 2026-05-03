@@ -106,35 +106,35 @@ function _renderSettingsPage() {
       ${_buildAccordion('sec_klinik', '🏥 Identitas Klinik',
           'Nama klinik, alamat, kontak yang tampil di aplikasi',
           _htmlIdentitasKlinik(),
-          'simpanSeksi("klinik")'
+          'klinik'
       )}
 
       <!-- ═══ SEKSI 2: AKSES MODUL PER JABATAN ═══ -->
       ${_buildAccordion('sec_akses', '🔐 Hak Akses per Jabatan',
           'Atur modul apa saja yang bisa diakses tiap jabatan',
           '<div id="aksesModulContainer">⏳ Memuat...</div>',
-          'simpanSeksi("akses")'
+          'akses'
       )}
 
       <!-- ═══ SEKSI 3: DATA DOKTER ═══ -->
       ${_buildAccordion('sec_dokter', '👨‍⚕️ Data Dokter / Tenaga Medis',
           'Daftar dokter & tenaga medis untuk cetak resep & Satu Sehat',
           _htmlDokterSection(),
-          'simpanSeksi("dokter")'
+          'dokter'
       )}
 
       <!-- ═══ SEKSI 4: KONFIGURASI AI ═══ -->
       ${_buildAccordion('sec_ai', '🤖 API Key Kecerdasan Buatan (AI)',
           'Gemini, Groq, OpenRouter, OpenAI, Mistral',
           _htmlAiSection(),
-          'simpanSeksi("ai")'
+          'ai'
       )}
 
       <!-- ═══ SEKSI 5: OCR & SATU SEHAT ═══ -->
       ${_buildAccordion('sec_integrasi', '🔗 Integrasi Eksternal',
           'OCR KTP, Satu Sehat FHIR',
           _htmlIntegrasiSection(),
-          'simpanSeksi("integrasi")'
+          'integrasi'
       )}
 
       <!-- ═══ TOMBOL SIMPAN SEMUA (bawah) ═══ -->
@@ -164,15 +164,29 @@ function _renderSettingsPage() {
 
     // Pasang style accordion inline jika belum ada
     _injectAccordionStyle();
+
+    // FIX: Pasang event listener ke tombol simpan via JS (bukan onclick inline)
+    // agar tidak ada konflik tanda kutip di atribut HTML
+    _bindSimpanButtons();
+}
+
+function _bindSimpanButtons() {
+    document.querySelectorAll('.btn-simpan-seksi[data-simpan-seksi]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const seksi = this.getAttribute('data-simpan-seksi');
+            simpanSeksi(seksi);
+        });
+    });
 }
 
 // ────────────────────────────────────────
 //  BUILDER ACCORDION SECTION
 // ────────────────────────────────────────
 function _buildAccordion(id, title, subtitle, bodyHtml, saveAction) {
-    // FIX: Tombol simpan dipindah ke DALAM accordion body tapi accordion dibuka otomatis
-    // (style="display:block") agar tombol selalu terlihat dan bisa diklik tanpa perlu
-    // klik header dulu. Arrow juga disesuaikan ke posisi terbuka (▼).
+    // FIX: Tombol simpan menggunakan data-simpan-seksi dengan nama seksi (bukan kode JS).
+    // Ini menghindari konflik tanda kutip di dalam atribut onclick="simpanSeksi("x")"
+    // yang menyebabkan browser memutus atribut di tengah dan tombol tidak berfungsi.
+    // Event handler dipasang via addEventListener setelah render selesai (_bindSimpanButtons).
     return `
     <div class="settings-accordion" id="${id}_wrap">
       <div class="settings-accordion-header" onclick="toggleSettingsSection('${id}')">
@@ -180,14 +194,14 @@ function _buildAccordion(id, title, subtitle, bodyHtml, saveAction) {
           <div class="settings-acc-title">${title}</div>
           <div class="settings-acc-sub">${subtitle}</div>
         </div>
-        <span class="settings-acc-arrow" id="${id}_arrow">▼</span>
+        <span class="settings-acc-arrow" id="${id}_arrow">▶</span>
       </div>
-      <div class="settings-accordion-body" id="${id}_body" style="display:block;">
+      <div class="settings-accordion-body" id="${id}_body" style="display:none;">
         <div class="settings-acc-content">
           ${bodyHtml}
         </div>
         <div class="settings-acc-footer">
-          <button class="btn-simpan-seksi" onclick="${saveAction}">
+          <button class="btn-simpan-seksi" data-simpan-seksi="${saveAction}">
             💾 Simpan Bagian Ini
           </button>
         </div>
