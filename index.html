@@ -3,25 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klikpro RME — Praktek Dokter</title>
+    <title>Klikpro RME V 2.0 — Praktek Dokter Reza Ariandes</title>
+
+    <!-- Tambahkan SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- ═══════════════════════════════════════════════════════════
-         KONFIGURASI MINIMAL — Nilai sebenarnya dimuat dari
-         Google Sheets (sheet: Konfigurasi) saat app berjalan.
-         Hanya APP_URL & BASE_URL yang perlu diubah di sini.
+         KONFIGURASI SISTEM & SUPABASE
     ═══════════════════════════════════════════════════════════ -->
     <script>
-        // ─── WAJIB DIISI: URL Google Apps Script ───
-        const APP_URL  = 'https://script.google.com/macros/s/AKfycbxHcyvfQm9KeJYt0Be3d_wo8_OZO9uOyGYf1ELFg0IFZmFG8HHiKM7ulNO4oiS2eycA/exec';
+        // ─── KONFIGURASI SUPABASE ───
+        const SUPABASE_URL = 'https://aqqlxytpryuwdggadjlt.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxcWx4eXRwcnl1d2RnZ2Fkamx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MjcyMDQsImV4cCI6MjA5MzMwMzIwNH0.EnQSNbD02hsToFxI6QC1B1dCm3gNavhegGQtgnFnZts';
+        
+        // PERBAIKAN: Menggunakan nama variabel 'supabaseClient' agar tidak bentrok dengan objek global 'supabase' dari CDN.
+        // Pastikan di file JS lain Anda memanggil 'supabaseClient.from(...)'
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ─── KONFIGURASI APLIKASI ───
         const BASE_URL = 'https://raw.githubusercontent.com/Rezaariandes/rme/main';
 
-        // ─── NILAI DEFAULT (akan di-override oleh data dari Sheets) ───
-        let KLINIK_NAMA   = 'Praktek Dokter';
-        let KLINIK_TITLE  = 'Klikpro RME';
+        // ─── NILAI DEFAULT (akan di-override oleh data dari Supabase saat berjalan) ───
+        // PERBAIKAN: Penyesuaian nama klinik dan versi aplikasi
+        let KLINIK_NAMA   = 'Praktek Dokter Reza Ariandes';
+        let KLINIK_TITLE  = 'Klikpro RME V 2.0';
         let JABATAN_MEDIS = ['Dokter', 'Admin', 'Paramedis'];
 
-        // AI_KEYS — akan di-override dari Sheets setelah login
-        // Isi sementara jika perlu testing sebelum settings dikonfigurasi
+        // AI_KEYS (Sebaiknya dipindahkan ke backend/Edge Functions atau Local Storage demi keamanan)
         let AI_KEYS = {
             gemini:     ['', '', ''],
             groq:       ['', '', ''],
@@ -43,16 +51,17 @@
             pageMedis:    BASE_URL + '/pages/page-medis.html',
             pageHariIni:  BASE_URL + '/pages/page-hari-ini.html',
             pageUser:     BASE_URL + '/pages/page-user.html',
-            pageSettings: BASE_URL + '/pages/page-settings.html',   // ← BARU
+            pageSettings: BASE_URL + '/pages/page-settings.html',
 
             jsUtils:    BASE_URL + '/js/utils.js',
+            jsSupabase: BASE_URL + '/js/supabase.js',
             jsAuth:     BASE_URL + '/js/auth.js',
             jsIcd10:    BASE_URL + '/js/icd10.js',
             jsPasien:   BASE_URL + '/js/pasien.js',
             jsKunj:     BASE_URL + '/js/kunjungan.js',
             jsModal:    BASE_URL + '/js/modal.js',
             jsUser:     BASE_URL + '/js/user.js',
-            jsSettings: BASE_URL + '/js/settings.js',               // ← BARU
+            jsSettings: BASE_URL + '/js/settings.js',
             jsApp:      BASE_URL + '/js/app.js',
             jsAiRek:    BASE_URL + '/js/ai-rekomendasi.js'
         };
@@ -135,7 +144,7 @@
         <div id="slot-page-medis"></div>
         <div id="slot-page-hari-ini"></div>
         <div id="slot-page-user"></div>
-        <div id="slot-page-settings"></div>   <!-- ← BARU -->
+        <div id="slot-page-settings"></div>
     </div>
 
     <script>
@@ -177,16 +186,16 @@
             document.getElementById('slot-page-medis').innerHTML      = pageMedis;
             document.getElementById('slot-page-hari-ini').innerHTML   = pageHariIni;
             document.getElementById('slot-page-user').innerHTML       = pageUser;
-            document.getElementById('slot-page-settings').innerHTML   = pageSettings;  // ← BARU
+            document.getElementById('slot-page-settings').innerHTML   = pageSettings;
 
-            // Nama klinik sementara (akan diupdate setelah loadSettings)
+            // Nama klinik sementara (akan diupdate setelah loadSettings di app.js)
             const h1   = document.querySelector('.app-title h1');
             const span = document.querySelector('.app-title span');
             if (h1)   h1.innerText   = KLINIK_TITLE;
             if (span) span.innerText = KLINIK_NAMA;
 
             setLoadStep('Memuat modul aplikasi...');
-            const jsKeys = ['jsUtils','jsAuth','jsIcd10','jsPasien','jsKunj',
+            const jsKeys = ['jsUtils','jsSupabase','jsAuth','jsIcd10','jsPasien','jsKunj',
                             'jsModal','jsUser','jsSettings','jsApp','jsAiRek'];
             const jsTexts = await Promise.all(
                 jsKeys.map(key =>
