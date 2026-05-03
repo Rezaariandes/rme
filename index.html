@@ -53,6 +53,8 @@
             pageUser:     BASE_URL + '/pages/page-user.html',
             pageSettings: BASE_URL + '/pages/page-settings.html',
             pageLaporan:  BASE_URL + '/pages/page-laporan.html',
+            pageStok:     BASE_URL + '/pages/page-stok.html',
+            pageBiaya:    BASE_URL + '/pages/page-biaya.html',
 
             jsUtils:    BASE_URL + '/js/utils.js',
             jsSupabase: BASE_URL + '/js/supabase.js',
@@ -65,7 +67,11 @@
             jsSettings: BASE_URL + '/js/settings.js',
             jsLaporan:  BASE_URL + '/js/laporan.js',
             jsApp:      BASE_URL + '/js/app.js',
-            jsAiRek:    BASE_URL + '/js/ai-rekomendasi.js'
+            jsAiRek:        BASE_URL + '/js/ai-rekomendasi.js',
+            jsSupabaseStok: BASE_URL + '/js/supabase-stok.js',
+            jsStok:         BASE_URL + '/js/stok.js',
+            jsSupabaseBiaya: BASE_URL + '/js/supabase-biaya.js',
+            jsBiaya:        BASE_URL + '/js/biaya.js'
         };
     </script>
 
@@ -148,6 +154,8 @@
         <div id="slot-page-user"></div>
         <div id="slot-page-settings"></div>
         <div id="slot-page-laporan"></div>
+        <div id="slot-page-stok"></div>
+        <div id="slot-page-biaya"></div>
     </div>
 
     <script>
@@ -166,7 +174,7 @@
         try {
             setLoadStep('Mengunduh tampilan...');
             const htmlKeys = ['css','pinLock','modalRiwayat','modalUser','header','nav',
-                              'pageDaftar','pageMedis','pageHariIni','pageUser','pageSettings','pageLaporan'];
+                              'pageDaftar','pageMedis','pageHariIni','pageUser','pageSettings','pageLaporan','pageStok','pageBiaya'];
             const htmlResults = await Promise.all(
                 htmlKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
@@ -176,7 +184,7 @@
                 )
             );
             const [css, pinLock, modalRiwayat, modalUser, header, nav,
-                   pageDaftar, pageMedis, pageHariIni, pageUser, pageSettings, pageLaporan] = htmlResults;
+                   pageDaftar, pageMedis, pageHariIni, pageUser, pageSettings, pageLaporan, pageStok, pageBiaya] = htmlResults;
 
             setLoadStep('Memuat antarmuka...');
             document.getElementById('dynamic-style').innerHTML = css;
@@ -191,6 +199,8 @@
             document.getElementById('slot-page-user').innerHTML       = pageUser;
             document.getElementById('slot-page-settings').innerHTML   = pageSettings;
             document.getElementById('slot-page-laporan').innerHTML    = pageLaporan;
+            document.getElementById('slot-page-stok').innerHTML       = pageStok;
+            document.getElementById('slot-page-biaya').innerHTML      = pageBiaya;
 
             // Nama klinik sementara (akan diupdate setelah loadSettings di app.js)
             const h1   = document.querySelector('.app-title h1');
@@ -202,8 +212,8 @@
             // PENTING: Urutan array ini menentukan urutan eksekusi.
             // jsSettings HARUS sebelum jsAuth karena auth.js memanggil
             // applyModuleAccess() yang didefinisikan di settings.js.
-            const jsKeys = ['jsUtils','jsSupabase','jsSettings','jsAuth','jsIcd10',
-                            'jsPasien','jsKunj','jsModal','jsUser','jsLaporan','jsApp','jsAiRek'];
+            const jsKeys = ['jsUtils','jsSupabase','jsSupabaseStok','jsSettings','jsAuth','jsIcd10',
+                            'jsPasien','jsKunj','jsModal','jsUser','jsLaporan','jsStok','jsSupabaseBiaya','jsBiaya','jsApp','jsAiRek'];
             const jsTexts = await Promise.all(
                 jsKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
