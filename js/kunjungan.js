@@ -53,12 +53,8 @@ async function fetchByDate() {
     const listEl = $('listHariIni');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data...</div>`;
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "initData", filterDate: filterEl.value })
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_initData()
+        const data = await sb_initData(filterEl.value);
         if (data.pasien) allPatients = data.pasien;
         kunjunganHariIni = data.hariIni || [];
         renderKunjunganHariIni();
@@ -159,16 +155,12 @@ async function bukaRekamMedisHariIni(kId) {
         const today        = new Date();
         const tzOffset     = today.getTimezoneOffset() * 60000;
         const localDateStr = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: "checkAndUpsertPasien",
-                nama: h.nama,
-                nik:  p ? (p.nik || '') : '',
-                localDate: localDateStr
-            })
+        // FIX: Ganti fetch(APP_URL) → sb_checkAndUpsertPasien()
+        const data = await sb_checkAndUpsertPasien({
+            nama: h.nama,
+            nik:  p ? (p.nik || '') : '',
+            localDate: localDateStr
         });
-        const data = await res.json();
         if (data && data.riwayat) {
             currentRiwayat = data.riwayat;
             renderRiwayatList(currentRiwayat, 'historyListMedis');
@@ -250,8 +242,8 @@ async function saveAll() {
     };
 
     try {
-        const res    = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const result = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_saveKunjungan()
+        const result = await sb_saveKunjungan(payload);
 
         if (result && result.status === "Sukses") {
             if (!currentKunjunganId && result.kunjunganId) {

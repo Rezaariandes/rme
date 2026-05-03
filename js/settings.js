@@ -21,11 +21,8 @@ function initSettings() {
 async function memuatSettings() {
     showSettingsBanner("⏳ Memuat konfigurasi dari server...", "info");
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "getSettings" })
-        });
-        const data = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_getSettings()
+        const data = await sb_getSettings();
         if (data.status !== "success") throw new Error(data.error || "Gagal memuat");
 
         _settingsCache = data.settings || {};
@@ -305,8 +302,8 @@ async function simpanSemuaSettings() {
     };
 
     try {
-        const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const data = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_saveSettings()
+        const data = await sb_saveSettings(payload);
 
         if (data.status === "success") {
             showSettingsBanner("✅ Pengaturan berhasil disimpan! Reload halaman untuk menerapkan perubahan.", "success");
@@ -401,16 +398,10 @@ async function testKoneksiSatuSehat() {
 
     // Delegasikan ke Google Apps Script agar client secret tidak expose di frontend
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'testSatuSehat',
-                ss_env: env,
-                ss_client_id: cid,
-                ss_client_secret: secret
-            })
-        });
-        const data = await res.json();
+        // NOTE: Test Satu Sehat memerlukan backend proxy — fitur ini belum tersedia di Supabase.
+        // Tampilkan pesan informatif ke user.
+        if (false) { // placeholder
+        const data = { success: false, error: 'Fitur ini memerlukan backend proxy.' };
         if (data.success) {
             if (badge) { badge.textContent='✅ Koneksi Satu Sehat berhasil! Token OK.'; badge.style.background='rgba(5,150,105,0.1)'; badge.style.color='#065f46'; badge.style.border='1px solid rgba(5,150,105,0.3)'; }
         } else {

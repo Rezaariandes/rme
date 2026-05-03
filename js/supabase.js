@@ -57,10 +57,14 @@ async function sb_saveSettings(payload) {
     }
     await Promise.all(updates);
 
-    // Simpan dokter: hapus semua lalu insert ulang
+    // BUG FIX: Perbaikan syntax DELETE dokter — path filter harus masuk ke URL, bukan headers
     if (payload.dokter) {
         const dokterList = JSON.parse(payload.dokter);
-        await _sbFetch('dokter', { method: 'DELETE', headers: { 'Prefer': '' } + '?id=neq.00000000-0000-0000-0000-000000000000' });
+        // Hapus semua dokter yang ada
+        await _sbFetch('dokter?id=neq.00000000-0000-0000-0000-000000000000', {
+            method: 'DELETE',
+            prefer: 'return=minimal'
+        });
         if (dokterList.length > 0) {
             await _sbFetch('dokter', { method: 'POST', body: dokterList, prefer: 'return=minimal' });
         }
@@ -90,14 +94,12 @@ async function sb_saveUser(payload) {
     const pinHash = pin ? await _sha256(pin) : null;
 
     if (userId) {
-        // Update PIN saja
         const body = {};
         if (pinHash) body.pin_hash = pinHash;
         if (nama)    body.nama     = nama;
         if (jabatan) body.jabatan  = jabatan;
         await _sbFetch(`users?id=eq.${userId}`, { method: 'PATCH', body, prefer: 'return=minimal' });
     } else {
-        // Insert user baru
         await _sbFetch('users', {
             method: 'POST',
             body: { nama, jabatan, pin_hash: pinHash },
@@ -144,7 +146,6 @@ async function sb_initData(filterDate) {
 async function sb_checkAndUpsertPasien(payload) {
     const { nama, nik, tgl_lahir, jk, alamat, localDate, createVisitToday, localTime } = payload;
 
-    // Cari pasien berdasarkan nama (atau NIK jika ada)
     let pasienRow = null;
     if (nik) {
         const rows = await _sbFetch(`pasien?nik=eq.${encodeURIComponent(nik)}&limit=1`);
@@ -156,14 +157,12 @@ async function sb_checkAndUpsertPasien(payload) {
     }
 
     if (!pasienRow) {
-        // Insert baru
         const inserted = await _sbFetch('pasien', {
             method: 'POST',
             body: { nama, nik: nik||null, jk: jk||'L', tgl_lahir: tgl_lahir||null, alamat: alamat||null }
         });
         pasienRow = inserted[0];
     } else if (tgl_lahir || alamat) {
-        // Update data jika ada yang baru
         await _sbFetch(`pasien?id=eq.${pasienRow.id}`, {
             method: 'PATCH',
             body: { ...(tgl_lahir && {tgl_lahir}), ...(alamat && {alamat}), ...(jk && {jk}), ...(nik && {nik}) },
@@ -171,7 +170,6 @@ async function sb_checkAndUpsertPasien(payload) {
         });
     }
 
-    // Buat kunjungan hari ini jika diminta
     if (createVisitToday && localDate) {
         const existing = await _sbFetch(
             `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1`
@@ -185,7 +183,6 @@ async function sb_checkAndUpsertPasien(payload) {
         }
     }
 
-    // Ambil riwayat kunjungan
     const riwayat = await _sbFetch(
         `kunjungan?pasien_id=eq.${pasienRow.id}&order=tgl.desc,waktu.desc&select=*`
     );
@@ -230,7 +227,6 @@ async function sb_saveKunjungan(payload) {
         keluhan, fisik, diagnosa, terapi, suratSakit
     } = payload;
 
-    // Update data pasien juga
     if (pasienId) {
         await _sbFetch(`pasien?id=eq.${pasienId}`, {
             method: 'PATCH',

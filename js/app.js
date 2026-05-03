@@ -18,7 +18,6 @@ function switchPage(id, navEl) {
     if (id === 'pageHariIni' && filterDate && filterDate.value) fetchByDate();
     if (id === 'pageUser')     fetchUsers();
     if (id === 'pageSettings') {
-        // Hanya Admin/Dokter yang boleh akses Settings
         if (typeof loggedInUser !== 'undefined' && loggedInUser) {
             const jabatan = (loggedInUser.jabatan || '').toLowerCase();
             if (jabatan === 'paramedis') {
@@ -31,17 +30,15 @@ function switchPage(id, navEl) {
     }
 }
 
-// ── MUAT KONFIGURASI AWAL DARI SUPABASE (setelah login) ──
+// ── MUAT KONFIGURASI AWAL DARI SUPABASE ──
 async function loadRuntimeSettings() {
     try {
-        // Menggunakan fungsi dari Supabase Client
-        const data = await sb_getSettings(); 
-        
+        // FIX: Ganti fetch(APP_URL) → sb_getSettings()
+        const data = await sb_getSettings();
         if (data.status !== "success" || !data.settings) return;
 
         const s = data.settings;
 
-        // Update konstanta global
         if (s.klinik_nama)  window.KLINIK_NAMA  = s.klinik_nama;
         if (s.klinik_title) window.KLINIK_TITLE = s.klinik_title;
         if (s.jabatan_medis) {
@@ -49,18 +46,15 @@ async function loadRuntimeSettings() {
             if (jabList.length > 0) window.JABATAN_MEDIS = jabList;
         }
 
-        // Update header
         const h1   = document.querySelector('.app-title h1');
         const span = document.querySelector('.app-title span');
         if (h1   && s.klinik_title) h1.innerText   = s.klinik_title;
         if (span && s.klinik_nama)  span.innerText  = s.klinik_nama;
 
-        // ── OCR API KEY — dari Settings, bukan hardcoded ──
         if (s.ocr_api_key && s.ocr_api_key.trim() !== '') {
             window.OCR_API_KEY = s.ocr_api_key.trim();
         }
 
-        // Update AI Keys — skip jika kosong/[]
         const providers = ['gemini','groq','openrouter','openai','mistral','cohere'];
         providers.forEach(p => {
             const rawKey = s[`ai_${p}`];
@@ -78,11 +72,9 @@ async function loadRuntimeSettings() {
             }
         });
 
-        // Simpan data dokter aktif
         if (data.dokter) window._dokterAktif = data.dokter;
 
     } catch (e) {
-        // Gagal muat settings tidak kritis, lanjutkan dengan nilai default
         console.warn('[Klikpro] Gagal muat runtime settings:', e.message);
     }
 }
@@ -105,12 +97,10 @@ async function initApp() {
     const filterDate = document.getElementById('filterDate');
     if (filterDate) filterDate.value = localISOTime;
 
-    if (typeof buildColorSwitcher === 'function') {
-        document.body.appendChild(buildColorSwitcher());
-    }
+    document.body.appendChild(buildColorSwitcher());
 
-    if (typeof populateIcd10   === 'function') populateIcd10('list-icd');
-    if (typeof initScanKtp     === 'function') initScanKtp();
+    if (typeof populateIcd10      === 'function') populateIcd10('list-icd');
+    if (typeof initScanKtp        === 'function') initScanKtp();
     if (typeof bindTglLahirFormat === 'function') bindTglLahirFormat('tgl_lahir');
 
     document.querySelectorAll('[data-save="true"]').forEach(el => {
@@ -119,19 +109,18 @@ async function initApp() {
         });
     });
 
-    const bbEl      = document.getElementById('bb');
-    const tbEl      = document.getElementById('tb');
-    const sistolEl  = document.getElementById('sistol');
-    const diastolEl = document.getElementById('diastol');
-    
-    if (bbEl && typeof calculateIMT === 'function') bbEl.addEventListener('input', calculateIMT);
-    if (tbEl && typeof calculateIMT === 'function') tbEl.addEventListener('input', calculateIMT);
-    if (sistolEl && typeof checkTensi === 'function') sistolEl.addEventListener('input', checkTensi);
-    if (diastolEl && typeof checkTensi === 'function') diastolEl.addEventListener('input', checkTensi);
+    const bbEl      = $('bb');
+    const tbEl      = $('tb');
+    const sistolEl  = $('sistol');
+    const diastolEl = $('diastol');
+    if (bbEl)      bbEl.addEventListener('input', calculateIMT);
+    if (tbEl)      tbEl.addEventListener('input', calculateIMT);
+    if (sistolEl)  sistolEl.addEventListener('input', checkTensi);
+    if (diastolEl) diastolEl.addEventListener('input', checkTensi);
 
     ['lab_gds','lab_chol','lab_ua'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && typeof checkLabAlert === 'function') el.addEventListener('input', checkLabAlert);
+        const el = $(id);
+        if (el) el.addEventListener('input', checkLabAlert);
     });
 
     if (localStorage.getItem('activePage') === 'pageMedis') {
@@ -139,17 +128,12 @@ async function initApp() {
         currentKunjunganId = localStorage.getItem('cK_id');
         if (currentKunjunganId === "null") currentKunjunganId = null;
 
-        const infoPasienNama = document.getElementById('infoPasienNama');
-        const infoPasienNik  = document.getElementById('infoPasienNik');
-        const infoPasienUmur = document.getElementById('infoPasienUmur');
-        const infoTglPemeriksaan = document.getElementById('infoTglPemeriksaan');
-
-        if (infoPasienNama)     infoPasienNama.innerText     = localStorage.getItem('cP_nama')  || '—';
-        if (infoPasienNik)      infoPasienNik.innerText      = localStorage.getItem('cP_nik')   || 'NIK: —';
-        if (infoPasienUmur)     infoPasienUmur.innerText     = localStorage.getItem('cP_umur')  || 'Umur: -';
-        if (infoTglPemeriksaan) {
-            infoTglPemeriksaan.innerText     = localStorage.getItem('cTglEdit') || 'Tgl: -';
-            infoTglPemeriksaan.style.display = 'block';
+        if ($('infoPasienNama'))     $('infoPasienNama').innerText     = localStorage.getItem('cP_nama')  || '—';
+        if ($('infoPasienNik'))      $('infoPasienNik').innerText      = localStorage.getItem('cP_nik')   || 'NIK: —';
+        if ($('infoPasienUmur'))     $('infoPasienUmur').innerText     = localStorage.getItem('cP_umur')  || 'Umur: -';
+        if ($('infoTglPemeriksaan')) {
+            $('infoTglPemeriksaan').innerText     = localStorage.getItem('cTglEdit') || 'Tgl: -';
+            $('infoTglPemeriksaan').style.display = 'block';
         }
 
         try {
@@ -161,23 +145,23 @@ async function initApp() {
         }
 
         if (typeof loadAutosave === 'function') loadAutosave();
-        if (typeof calculateIMT === 'function') calculateIMT();
-        if (typeof checkTensi === 'function') checkTensi();
-        if (typeof checkLabAlert === 'function') checkLabAlert();
+        calculateIMT();
+        checkTensi();
+        checkLabAlert();
 
         switchPage('pageMedis', null);
     } else {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // ── FIX RACE CONDITION ──
+    // FIX: loadRuntimeSettings sekarang memakai sb_getSettings (Supabase)
     try {
         await loadRuntimeSettings();
     } catch(e) {
         console.warn('[Klikpro] Settings gagal, lanjut dengan default');
     }
 
-    // ── Ambil data awal dari Supabase ──
+    // FIX: Ambil data awal via sb_initData (Supabase) — bukan fetch(APP_URL)
     try {
         const data = await sb_initData(localISOTime);
 
@@ -186,8 +170,6 @@ async function initApp() {
 
         const listPasien = document.getElementById('list-pasien');
         if (listPasien && allPatients.length > 0) {
-            // Bersihkan list sebelum diisi agar tidak bertumpuk
-            listPasien.innerHTML = '';
             allPatients.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.nama;
@@ -198,9 +180,7 @@ async function initApp() {
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
 
     } catch (e) {
-        console.error("Gagal init data:", e);
-        if (typeof showToast === 'function') {
-            showToast("⚡ Gagal memuat data dari database. Cek koneksi.", "error");
-        }
+        showToast("⚡ Gagal terhubung ke server. Cek koneksi.", "error");
+        console.error('[Klikpro] initData error:', e);
     }
 }

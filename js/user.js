@@ -1,24 +1,21 @@
 // ════════════════════════════════════════════════════════
 //  KLIKPRO RME — MODUL USER
 //  Manajemen akun user & PIN
-//  KEAMANAN: PIN tidak pernah ditampilkan ke frontend
 // ════════════════════════════════════════════════════════
 
 let userListCache = [];
 
-// ── AMBIL DAFTAR USER DARI SERVER ──
+// ── AMBIL DAFTAR USER DARI SUPABASE ──
 async function fetchUsers() {
     const listEl = $('listUserContainer');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data user...</div>`;
     try {
-        const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify({ action: "getUsers" }) });
-        const data = await res.json();
-        // Simpan cache tanpa field PIN (PIN tidak boleh dikirim ke frontend)
-        userListCache = (data.data || data.users || []).map(u => ({
+        // FIX: Ganti fetch(APP_URL) → sb_getUsers()
+        const data = await sb_getUsers();
+        userListCache = (data.data || []).map(u => ({
             id:      u.id,
             nama:    u.nama,
             jabatan: u.jabatan
-            // PIN sengaja tidak disimpan di frontend
         }));
         renderUserList();
     } catch (e) {
@@ -59,10 +56,8 @@ async function simpanUserBaru() {
     if (btn) { btn.disabled = true; btn.innerText = "Menyimpan..."; }
 
     try {
-        await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "saveUser", nama, jabatan, pin })
-        });
+        // FIX: Ganti fetch(APP_URL) → sb_saveUser()
+        await sb_saveUser({ nama, jabatan, pin });
         showToast("✅ User baru berhasil disimpan", "success");
         if ($('u_nama'))    $('u_nama').value    = '';
         if ($('u_jabatan')) $('u_jabatan').value = 'Admin';
@@ -70,7 +65,7 @@ async function simpanUserBaru() {
         fetchUsers();
         if (typeof loadLoginUsers === "function") loadLoginUsers();
     } catch (e) {
-        showToast("❌ Gagal menyimpan user", "error");
+        showToast("❌ Gagal menyimpan user: " + (e.message || ''), "error");
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = "💾 Simpan Akun User"; }
     }
@@ -83,7 +78,6 @@ function openEditUserModal(id) {
     if ($('edit_u_id'))      $('edit_u_id').value      = u.id;
     if ($('edit_u_nama'))    $('edit_u_nama').value    = u.nama;
     if ($('edit_u_jabatan')) $('edit_u_jabatan').value = u.jabatan;
-    // Tidak pre-fill PIN — user harus ketik PIN baru
     if ($('edit_u_pin'))     $('edit_u_pin').value     = '';
     const modal = $('modalUser');
     if (modal) modal.classList.add('show');
@@ -91,7 +85,7 @@ function openEditUserModal(id) {
 
 // ── UPDATE PIN USER ──
 async function updatePinUser() {
-    const id     = $('edit_u_id')  ? $('edit_u_id').value              : '';
+    const id     = $('edit_u_id')  ? $('edit_u_id').value         : '';
     const newPin = $('edit_u_pin') ? $('edit_u_pin').value.trim() : '';
     if (!newPin || newPin.length < 4) return showToast("⚠️ PIN minimal 4 digit", "warning");
 
@@ -99,21 +93,15 @@ async function updatePinUser() {
     if (btn) { btn.disabled = true; btn.innerText = "Mengupdate..."; }
 
     try {
-        await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "saveUser", userId: id, pin: newPin })
-        });
+        // FIX: Ganti fetch(APP_URL) → sb_saveUser()
+        await sb_saveUser({ userId: id, pin: newPin });
         showToast("✅ PIN berhasil diupdate", "success");
         const modal = $('modalUser');
         if (modal) modal.classList.remove('show');
         fetchUsers();
     } catch (e) {
-        showToast("❌ Gagal update PIN", "error");
+        showToast("❌ Gagal update PIN: " + (e.message || ''), "error");
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = "💾 Update User"; }
     }
 }
-
-// ── AUTO-INIT: dipanggil dari initApp() setelah fragment HTML ter-inject ──
-// BUG FIX: auto-init dihapus; fetchUsers() dipanggil dari switchPage/initApp
-// sehingga elemen #listUserContainer sudah pasti ada di DOM.

@@ -27,11 +27,8 @@ async function autoFillPasien() {
     }
 
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "checkAndUpsertPasien", nama: p.nama, nik: p.nik })
-        });
-        const data = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_checkAndUpsertPasien()
+        const data = await sb_checkAndUpsertPasien({ nama: p.nama, nik: p.nik });
         // BUG FIX: Guard — data.pasien bisa null jika server error
         if (data && data.pasien && data.pasien.id) {
             currentPasienId = data.pasien.id;
@@ -64,8 +61,8 @@ async function simpanDataPasienOnly() {
             jk:     $('jk')     ? $('jk').value     : 'L',
             alamat
         };
-        const res    = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const result = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_savePasienOnly()
+        const result = await sb_savePasienOnly(payload);
         if (result.status === "Sukses") currentPasienId = result.pasienId;
         showToast("✅ Profil pasien disimpan", "success");
     } catch (e) {
@@ -128,9 +125,8 @@ async function lanjutPemeriksaan() {
             jk:        $('jk')        ? $('jk').value        : 'L',
             alamat:    $('alamat')    ? $('alamat').value     : ''
         };
-        const res  = await fetch(APP_URL, { method: 'POST', body: JSON.stringify(payload) });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
+        // FIX: Ganti fetch(APP_URL) → sb_checkAndUpsertPasien()
+        const data = await sb_checkAndUpsertPasien(payload);
         if (!data || !data.pasien) throw new Error('Respons server tidak valid');
 
         currentPasienId = data.pasien.id;
