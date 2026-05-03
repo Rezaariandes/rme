@@ -171,16 +171,30 @@ function _renderSettingsPage() {
     </div>
 
     <!-- Modal konfirmasi hapus dokter -->
-    <div id="modalKonfirmasiHapusDokter" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
-      <div class="modal-card" style="max-width:340px;">
-        <div style="font-size:2rem;text-align:center;">⚠️</div>
-        <div style="text-align:center;font-weight:700;font-size:15px;margin:8px 0;">Hapus Dokter?</div>
-        <div style="text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:16px;">
-          Hapus data "<span id="konfirmasiHapusDokterNama" style="font-weight:700;color:var(--danger)"></span>"?
+    <div id="modalKonfirmasiHapusDokter"
+         onclick="if(event.target===this)this.style.display='none'"
+         style="display:none;position:fixed;inset:0;z-index:99999;
+                background:rgba(0,0,0,0.45);
+                align-items:center;justify-content:center;
+                padding:20px;box-sizing:border-box;">
+      <div style="background:var(--card-bg,#fff);border-radius:18px;
+                  padding:24px 20px 20px;width:100%;max-width:320px;
+                  box-shadow:0 8px 32px rgba(0,0,0,0.18);
+                  box-sizing:border-box;">
+        <div style="font-size:2.2rem;text-align:center;margin-bottom:6px;">⚠️</div>
+        <div style="text-align:center;font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text-primary,#1e293b);">Hapus Dokter?</div>
+        <div style="text-align:center;color:var(--text-muted,#64748b);font-size:13px;margin-bottom:20px;line-height:1.5;">
+          Hapus data "<span id="konfirmasiHapusDokterNama" style="font-weight:700;color:#ef4444;"></span>"?
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn-secondary" style="flex:1" onclick="$('modalKonfirmasiHapusDokter').classList.remove('show')">Batal</button>
-          <button class="btn-danger" style="flex:1" id="btnKonfirmasiHapusDokterYa">Hapus</button>
+        <div style="display:flex;gap:10px;">
+          <button onclick="$('modalKonfirmasiHapusDokter').style.display='none'"
+                  style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(100,116,139,0.25);
+                         background:rgba(100,116,139,0.08);color:var(--text-primary,#1e293b);
+                         font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Batal</button>
+          <button id="btnKonfirmasiHapusDokterYa"
+                  style="flex:1;padding:11px;border-radius:10px;border:none;
+                         background:#ef4444;color:#fff;
+                         font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Hapus</button>
         </div>
       </div>
     </div>
@@ -883,9 +897,10 @@ function konfirmasiHapusDokter(i, nama) {
         btnYa.parentNode.replaceChild(newBtn, btnYa);
         $('btnKonfirmasiHapusDokterYa').onclick = () => {
             hapusDokterRow(i);
-            modal.classList.remove('show');
+            modal.style.display = 'none';
         };
-        modal.classList.add('show');
+        // Tampilkan sebagai flex agar align-items & justify-content bekerja
+        modal.style.display = 'flex';
     } else {
         if (confirm('Hapus data "' + nama + '"?')) hapusDokterRow(i);
     }
