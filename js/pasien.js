@@ -149,6 +149,8 @@ async function lanjutPemeriksaan() {
         } else {
             // Belum ada kunjungan hari ini — ID null, akan dibuat baru saat saveAll()
             currentKunjunganId = null;
+            // BUG FIX: Pastikan surat sakit tidak tercentang untuk kunjungan baru
+            if ($('suratSakit')) $('suratSakit').checked = false;
             showToast("✅ Siap periksa: " + namaPasien, "success");
         }
 
