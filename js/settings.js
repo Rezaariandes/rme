@@ -396,19 +396,17 @@ async function testKoneksiSatuSehat() {
     if (btn) { btn.disabled=true; btn.textContent='🔄 Menghubungkan...'; }
     if (badge) { badge.style.display='block'; badge.textContent='🔄 Menghubungkan ke Satu Sehat...'; badge.style.background='rgba(59,130,246,0.1)'; badge.style.color='#1d4ed8'; badge.style.border='1px solid rgba(59,130,246,0.3)'; }
 
-    // Delegasikan ke Google Apps Script agar client secret tidak expose di frontend
+    // NOTE: Test Satu Sehat memerlukan backend proxy — belum tersedia di mode Supabase murni.
+    // Tampilkan pesan informatif ke user.
     try {
-        // NOTE: Test Satu Sehat memerlukan backend proxy — fitur ini belum tersedia di Supabase.
-        // Tampilkan pesan informatif ke user.
-        if (false) { // placeholder
-        const data = { success: false, error: 'Fitur ini memerlukan backend proxy.' };
-        if (data.success) {
-            if (badge) { badge.textContent='✅ Koneksi Satu Sehat berhasil! Token OK.'; badge.style.background='rgba(5,150,105,0.1)'; badge.style.color='#065f46'; badge.style.border='1px solid rgba(5,150,105,0.3)'; }
-        } else {
-            throw new Error(data.error || 'Autentikasi gagal');
+        if (badge) {
+            badge.textContent = '⚠️ Fitur Test Satu Sehat memerlukan backend proxy. Hubungi pengembang.';
+            badge.style.background = 'rgba(245,158,11,0.1)';
+            badge.style.color = '#92400e';
+            badge.style.border = '1px solid rgba(245,158,11,0.3)';
         }
     } catch(e) {
-        if (badge) { badge.textContent='❌ Gagal: ' + (e.message||'Cek Client ID & Secret'); badge.style.background='rgba(239,68,68,0.1)'; badge.style.color='#dc2626'; badge.style.border='1px solid rgba(239,68,68,0.3)'; }
+        if (badge) { badge.textContent='❌ Gagal: ' + (e.message||''); badge.style.background='rgba(239,68,68,0.1)'; badge.style.color='#dc2626'; badge.style.border='1px solid rgba(239,68,68,0.3)'; }
     } finally {
         if (btn) { btn.disabled=false; btn.textContent='🔗 Test Koneksi Satu Sehat'; }
     }
