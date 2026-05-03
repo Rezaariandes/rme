@@ -34,11 +34,9 @@ function switchPage(id, navEl) {
 // ── MUAT KONFIGURASI AWAL DARI SERVER (setelah login) ──
 async function loadRuntimeSettings() {
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "getSettings" })
-        });
-        const data = await res.json();
+        // PERBAIKAN: Menggunakan fungsi Supabase Client alih-alih fetch() ke APP_URL
+        const data = await sb_getSettings(); 
+        
         if (data.status !== "success" || !data.settings) return;
 
         const s = data.settings;
