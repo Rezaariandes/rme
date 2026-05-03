@@ -170,34 +170,6 @@ function _renderSettingsPage() {
 
     </div>
 
-    <!-- Modal konfirmasi hapus dokter -->
-    <div id="modalKonfirmasiHapusDokter"
-         onclick="if(event.target===this)this.style.display='none'"
-         style="display:none;position:fixed;inset:0;z-index:99999;
-                background:rgba(0,0,0,0.45);
-                align-items:center;justify-content:center;
-                padding:20px;box-sizing:border-box;">
-      <div style="background:var(--card-bg,#fff);border-radius:18px;
-                  padding:24px 20px 20px;width:100%;max-width:320px;
-                  box-shadow:0 8px 32px rgba(0,0,0,0.18);
-                  box-sizing:border-box;">
-        <div style="font-size:2.2rem;text-align:center;margin-bottom:6px;">⚠️</div>
-        <div style="text-align:center;font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text-primary,#1e293b);">Hapus Dokter?</div>
-        <div style="text-align:center;color:var(--text-muted,#64748b);font-size:13px;margin-bottom:20px;line-height:1.5;">
-          Hapus data "<span id="konfirmasiHapusDokterNama" style="font-weight:700;color:#ef4444;"></span>"?
-        </div>
-        <div style="display:flex;gap:10px;">
-          <button onclick="$('modalKonfirmasiHapusDokter').style.display='none'"
-                  style="flex:1;padding:11px;border-radius:10px;border:1px solid rgba(100,116,139,0.25);
-                         background:rgba(100,116,139,0.08);color:var(--text-primary,#1e293b);
-                         font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Batal</button>
-          <button id="btnKonfirmasiHapusDokterYa"
-                  style="flex:1;padding:11px;border-radius:10px;border:none;
-                         background:#ef4444;color:#fff;
-                         font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Hapus</button>
-        </div>
-      </div>
-    </div>
     `;
 
     // Pasang style accordion inline jika belum ada
@@ -838,7 +810,6 @@ function _renderDokterList() {
         // Hidden input untuk user_id agar _kumpulkanDokter() tetap bisa membacanya
         return `
     <div class="dokter-row" id="dokter_row_${i}">
-      <button class="btn-hapus-dokter" onclick="konfirmasiHapusDokter(${i}, '${escHtml(d.nama || 'dokter ini')}')">✕ Hapus</button>
       <input type="hidden" id="dk_user_id_${i}" value="${escHtml(d.user_id || '')}">
       ${linkedUserInfo}
       <div class="row g-2 mb-2">
@@ -886,42 +857,6 @@ function tambahBarisDokter() {
     if (rows.length > 0) rows[rows.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
-function konfirmasiHapusDokter(i, nama) {
-    const modal   = $('modalKonfirmasiHapusDokter');
-    const labelEl = $('konfirmasiHapusDokterNama');
-    const btnYa   = $('btnKonfirmasiHapusDokterYa');
-
-    if (modal && labelEl && btnYa) {
-        labelEl.textContent = nama;
-        const newBtn = btnYa.cloneNode(true);
-        btnYa.parentNode.replaceChild(newBtn, btnYa);
-        $('btnKonfirmasiHapusDokterYa').onclick = () => {
-            hapusDokterRow(i);
-            modal.style.display = 'none';
-        };
-        // Tampilkan sebagai flex agar align-items & justify-content bekerja
-        modal.style.display = 'flex';
-    } else {
-        if (confirm('Hapus data "' + nama + '"?')) hapusDokterRow(i);
-    }
-}
-
-async function hapusDokterRow(i) {
-    _dokterList.splice(i, 1);
-    _renderDokterList();
-
-    // Auto-save langsung ke Supabase agar tidak muncul lagi saat reload
-    try {
-        showSettingsBanner("⏳ Menyimpan perubahan...", "info");
-        await sb_saveSettings({ dokter: JSON.stringify(_dokterList) });
-        window._dokterAktif = _dokterList;
-        showSettingsBanner("✅ Dokter berhasil dihapus", "success");
-        setTimeout(() => hideSettingsBanner(), 2000);
-    } catch(e) {
-        showSettingsBanner("❌ Gagal menyimpan: " + (e.message || 'Cek koneksi'), "error");
-        showToast("❌ Hapus gagal disimpan ke server", "error");
-    }
-}
 
 function _kumpulkanDokter() {
     return _dokterList.map((_, i) => ({
@@ -1526,19 +1461,9 @@ function _injectAccordionStyle() {
         cursor: pointer; font-family: inherit;
     }
     .btn-hapus-dokter {
-        position: absolute; top: 8px; right: 10px;
-        background: rgba(239,68,68,0.08);
-        border: 1px solid rgba(239,68,68,0.2);
-        color: #ef4444;
-        border-radius: 7px;
-        padding: 3px 8px;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        font-family: inherit;
+        display: none;
     }
     .dokter-row {
-        position: relative;
         border: 1px solid rgba(var(--primary-rgb,37,99,235),0.1);
         border-radius: 10px;
         padding: 12px 10px 10px;
