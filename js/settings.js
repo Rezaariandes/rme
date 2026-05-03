@@ -927,16 +927,13 @@ async function testKoneksiSatuSehat() {
         badge.textContent='🔄 Menghubungkan ke Satu Sehat...';
         Object.assign(badge.style, { background:'rgba(59,130,246,0.1)', color:'#1d4ed8', border:'1px solid rgba(59,130,246,0.3)' });
     }
-    // Delegasikan ke backend karena client secret tidak boleh expose di frontend
+    // Test Satu Sehat membutuhkan backend proxy karena client_secret tidak boleh diekspos di frontend.
+    // Fitur ini belum tersedia tanpa backend/Edge Function Supabase.
     try {
-        const res  = await fetch(typeof APP_URL !== 'undefined' ? APP_URL : '', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'testSatuSehat', ss_env: env, ss_client_id: cid, ss_client_secret: secret })
-        });
-        const data = await res.json();
-        if (data.success) {
-            if (badge) { badge.textContent='✅ Koneksi berhasil! Token OK.'; Object.assign(badge.style, { background:'rgba(5,150,105,0.1)', color:'#065f46', border:'1px solid rgba(5,150,105,0.3)' }); }
-        } else { throw new Error(data.error || 'Autentikasi gagal'); }
+        if (badge) {
+            badge.textContent = '⚠️ Test koneksi Satu Sehat memerlukan backend proxy. Simpan konfigurasi dan hubungi administrator untuk verifikasi.';
+            Object.assign(badge.style, { background:'rgba(245,158,11,0.1)', color:'#92400e', border:'1px solid rgba(245,158,11,0.3)' });
+        }
     } catch(e) {
         if (badge) { badge.textContent='❌ Gagal: ' + (e.message||'Cek Client ID & Secret'); Object.assign(badge.style, { background:'rgba(239,68,68,0.1)', color:'#dc2626', border:'1px solid rgba(239,68,68,0.3)' }); }
     } finally {

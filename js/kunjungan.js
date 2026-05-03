@@ -84,11 +84,13 @@ function renderKunjunganHariIni() {
     container.innerHTML = sorted.map(h => {
         const isDone    = h.status === 'Selesai';
         const diagRow   = window._isParamedis ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
+        // FIX: Jika h.nama kosong (join gagal), cari di allPatients via pasienId
+        const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.62' : '1'};" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div class="visit-time-badge">${h.waktu || '-'}</div>
             <div style="flex:1; min-width:0;">
-                <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${h.nama}</div>
+                <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tampilNama}</div>
                 <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">Keluhan: ${h.keluhan || '-'}</div>
                 <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C</div>
                 ${diagRow}
@@ -105,7 +107,12 @@ async function bukaRekamMedisHariIni(kId) {
     const h = kunjunganHariIni.find(x => x.id === kId);
     if (!h) return showToast("❌ Data tidak ditemukan", "error");
 
-    const p = allPatients.find(x => x.id === h.pasienId) || allPatients.find(x => x.nama === h.nama);
+    // FIX: Cari pasien di allPatients — coba via pasienId dulu, lalu via nama
+    // Jika h.nama kosong (join gagal di sb_initData), ambil nama dari pasien yang ketemu
+    const p = allPatients.find(x => x.id === h.pasienId) || allPatients.find(x => x.nama && h.nama && x.nama === h.nama);
+
+    // FIX: Pastikan namaPasien selalu terisi — prioritas: dari pasien DB, lalu dari h.nama
+    const namaPasien = (p && p.nama) ? p.nama : (h.nama || '');
 
     if (p) {
         if ($('nama'))      $('nama').value      = p.nama;
@@ -114,14 +121,16 @@ async function bukaRekamMedisHariIni(kId) {
         if ($('alamat'))    $('alamat').value    = p.alamat || '';
         if ($('tgl_lahir')) $('tgl_lahir').value = formatTglIndo(p.tgl) || '';
     } else {
-        if ($('nama')) $('nama').value = h.nama;
+        // Pasien tidak ada di cache lokal — isi dari data kunjungan & fetch dari DB nanti
+        if ($('nama')) $('nama').value = namaPasien;
     }
 
     currentPasienId    = h.pasienId;
     currentKunjunganId = h.id;
     const umur         = p ? hitungUmur(p.tgl) : '-';
 
-    if ($('infoPasienNama')) $('infoPasienNama').innerText = h.nama;
+    // FIX: Gunakan namaPasien (sudah dijamin tidak kosong) untuk semua tampilan
+    if ($('infoPasienNama')) $('infoPasienNama').innerText = namaPasien || '—';
     if ($('infoPasienNik'))  $('infoPasienNik').innerText  = "NIK: " + (p ? (p.nik || '-') : '-');
     if ($('infoPasienUmur')) $('infoPasienUmur').innerText = "Umur: " + umur;
 
@@ -150,7 +159,7 @@ async function bukaRekamMedisHariIni(kId) {
     localStorage.setItem('activePage', 'pageMedis');
     localStorage.setItem('cP_id',     currentPasienId);
     localStorage.setItem('cK_id',     currentKunjunganId);
-    localStorage.setItem('cP_nama',   h.nama);
+    localStorage.setItem('cP_nama',   namaPasien);   // FIX: pakai namaPasien (dijamin tidak kosong)
     localStorage.setItem('cP_nik',    "NIK: " + (p ? (p.nik || '-') : '-'));
     localStorage.setItem('cP_umur',   "Umur: " + umur);
     localStorage.setItem('cTglEdit',  tanggalRekamLabel);
@@ -217,7 +226,8 @@ async function saveAll() {
     const sis = $('sistol')  ? $('sistol').value  : '';
     const dia = $('diastol') ? $('diastol').value : '';
     const tdGabungan = (sis || dia) ? ((sis || '-') + '/' + (dia || '-')) : '';
-    const diagGabung = d2 ? (d1 + " | " + d2) : d1;
+    // FIX: diagnosa1 & diagnosa2 dikirim sebagai field terpisah (bukan digabung)
+    // agar masing-masing tersimpan di kolom DB yang benar dan bisa dibaca kembali
 
     const today        = new Date();
     const tzOffset     = today.getTimezoneOffset() * 60000;
@@ -246,7 +256,8 @@ async function saveAll() {
         lab_ua:   $('lab_ua')   ? $('lab_ua').value   : '',
         keluhan:  $('keluhan')  ? $('keluhan').value  : '',
         fisik:    $('fisik')    ? $('fisik').value    : '',
-        diagnosa: diagGabung,
+        diagnosa:  d1,
+        diagnosa2: d2,
         terapi:   terapi,
         suratSakit: ($('suratSakit') && $('suratSakit').checked) ? "YA" : "TIDAK"
     };

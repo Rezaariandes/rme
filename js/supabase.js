@@ -263,7 +263,7 @@ async function sb_saveKunjungan(payload) {
         nama, nik, tgl_lahir, jk, alamat,
         td, nadi, rr, suhu, bb, tb,
         lab_gds, lab_chol, lab_ua,
-        keluhan, fisik, diagnosa, terapi, suratSakit
+        keluhan, fisik, diagnosa, diagnosa2, terapi, suratSakit
     } = payload;
 
     if (pasienId) {
@@ -279,7 +279,7 @@ async function sb_saveKunjungan(payload) {
         pasien_id: pasienId, tgl: localDate, waktu: localTime,
         td, nadi, rr, suhu, bb, tb,
         lab_gds, lab_chol, lab_ua,
-        keluhan, fisik, diagnosa, terapi,
+        keluhan, fisik, diagnosa, diagnosa2: diagnosa2 || null, terapi,
         surat_sakit: suratSakit,
         status: isSelesai ? 'Selesai' : 'Menunggu'
     };
