@@ -81,9 +81,22 @@ function renderKunjunganHariIni() {
         return String(a.waktu || "00:00").localeCompare(String(b.waktu || "00:00"));
     });
 
+    // Helper: resolve nama dokter pemeriksa dari user_id di window._dokterAktif
+    function _getDokterPemeriksa(userId) {
+        if (!userId) return null;
+        const dokterList = window._dokterAktif || [];
+        const d = dokterList.find(dk => dk.user_id && String(dk.user_id) === String(userId));
+        return d ? d.nama : null;
+    }
+
     container.innerHTML = sorted.map(h => {
         const isDone    = h.status === 'Selesai';
         const diagRow   = window._isParamedis ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
+        // Nama dokter pemeriksa (dari relasi user_id → tabel dokter)
+        const dokterNama = _getDokterPemeriksa(h.user_id);
+        const dokterRow  = dokterNama
+            ? `<div style="font-size:10px;color:var(--primary);font-weight:600;margin-top:2px;">👨‍⚕️ ${dokterNama}</div>`
+            : '';
         // FIX: Jika h.nama kosong (join gagal di sb_initData), cari dari allPatients
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
         return `
@@ -94,6 +107,7 @@ function renderKunjunganHariIni() {
                 <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">Keluhan: ${h.keluhan || '-'}</div>
                 <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C</div>
                 ${diagRow}
+                ${dokterRow}
             </div>
             <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
         </div>`;
@@ -238,6 +252,8 @@ async function saveAll() {
         kunjunganId: currentKunjunganId || "",
         localDate:   localDateStr,
         localTime:   localTimeStr,
+        // Sertakan user_id dokter yang sedang login agar kunjungan tercatat ke dokter pemeriksa
+        userId: (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : null,
         nik:      $('nik')      ? $('nik').value      : '',
         nama:     $('nama')     ? $('nama').value     : '',
         tgl_lahir: $('tgl_lahir') ? $('tgl_lahir').value : '',

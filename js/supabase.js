@@ -71,7 +71,12 @@ async function sb_saveSettings(payload) {
             prefer: 'return=minimal'
         });
         if (dokterList.length > 0) {
-            await _sbFetch('dokter', { method: 'POST', body: dokterList, prefer: 'return=minimal' });
+            await _sbFetch('dokter', { method: 'POST', body: dokterList.map(d => ({
+                nama: d.nama, jabatan: d.jabatan, nik: d.nik || null,
+                ihs: d.ihs || null, sip: d.sip || null,
+                spesialis: d.spesialis || null,
+                user_id: d.user_id || null
+            })), prefer: 'return=minimal' });
         }
     }
     return { status: 'success' };
@@ -135,7 +140,8 @@ async function sb_initData(filterDate) {
             id: k.id, pasienId: k.pasien_id,
             nama: p.nama || '', waktu: k.waktu, tgl: k.tgl,
             td: k.td, suhu: k.suhu, keluhan: k.keluhan,
-            diag: k.diagnosa, status: k.status || 'Menunggu'
+            diag: k.diagnosa, status: k.status || 'Menunggu',
+            user_id: k.user_id || null
         };
     });
 
@@ -205,6 +211,7 @@ async function sb_checkAndUpsertPasien(payload) {
     // Mapper helper agar konsisten
     const _mapKunjungan = r => ({
         id: r.id, tgl: r.tgl, waktu: r.waktu,
+        user_id: r.user_id || null,
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
         // Lab dasar
@@ -266,6 +273,7 @@ async function sb_getKunjunganById(kunjunganId) {
     const r = rows[0];
     return {
         id: r.id, pasien_id: r.pasien_id, tgl: r.tgl, waktu: r.waktu,
+        user_id: r.user_id || null,
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
         // Lab dasar
@@ -294,6 +302,7 @@ async function sb_getKunjunganById(kunjunganId) {
 async function sb_saveKunjungan(payload) {
     const {
         pasienId, kunjunganId, localDate, localTime,
+        userId,
         nama, nik, tgl_lahir, jk, alamat,
         td, nadi, rr, suhu, bb, tb,
         lab_gds, lab_chol, lab_ua,
@@ -322,6 +331,7 @@ async function sb_saveKunjungan(payload) {
     const isSelesai = diagnosa && terapi;
     const body = {
         pasien_id: pasienId, tgl: localDate, waktu: localTime,
+        user_id: payload.userId || null,
         td: td || null,
         nadi:     _num(nadi),
         rr:       _num(rr),

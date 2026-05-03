@@ -8,7 +8,25 @@
 
 // ── State settings lokal ──
 let _settingsCache = {};
-let _dokterList    = [];   // [{nama, nik, ihs, kode_dokter, jabatan}]
+let _dokterList    = [];   // [{nama, nik, ihs, kode_dokter, jabatan, user_id}]
+let _userListCache = [];   // [{id, nama, jabatan}] — untuk dropdown link dokter ke akun
+
+// ── Helper: build <option> list dari _userListCache ──
+function _buildUserOptions(selectedUserId) {
+    return _userListCache.map(u =>
+        `<option value="${escHtml(u.id)}" ${String(u.id) === String(selectedUserId) ? 'selected' : ''}>${escHtml(u.nama)} (${escHtml(u.jabatan)})</option>`
+    ).join('');
+}
+
+// ── Muat daftar user ke cache agar bisa dipakai di dropdown dokter ──
+async function _loadUserList() {
+    try {
+        const res = await sb_getUsers();
+        _userListCache = (res.data || []);
+    } catch(e) {
+        _userListCache = [];
+    }
+}
 
 // ── Definisi semua modul & sub-modul yang bisa diatur aksesnya ──
 const MODULE_DEFINITIONS = [
@@ -532,6 +550,7 @@ async function memuatSettings() {
         _dokterList    = data.dokter   || [];
 
         _isiFormDariSettings(_settingsCache);
+        await _loadUserList();  // muat daftar user agar dropdown link dokter↔akun tersedia
         _renderDokterList();
         _renderAiKeys(_settingsCache);
         _initModuleAccess();
@@ -803,6 +822,18 @@ function _renderDokterList() {
           </select>
         </div>
       </div>
+      <div class="row g-2 mb-2">
+        <div class="col-12">
+          <label class="cfg-label">🔗 Akun User (Login) yang Terhubung</label>
+          <select class="form-control" id="dk_user_id_${i}">
+            <option value="">— Tidak terhubung ke akun —</option>
+            ${_buildUserOptions(d.user_id || '')}
+          </select>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">
+            💡 Hubungkan ke akun user agar kunjungan yang diperiksa tercatat atas nama dokter ini (untuk integrasi Satu Sehat).
+          </div>
+        </div>
+      </div>
       <div class="row g-2">
         <div class="col-6">
           <label class="cfg-label">NIK KTP</label>
@@ -825,7 +856,7 @@ function _renderDokterList() {
 }
 
 function tambahBarisDokter() {
-    _dokterList.push({ nama:'', jabatan:'Dokter', nik:'', ihs:'', sip:'', spesialis:'' });
+    _dokterList.push({ nama:'', jabatan:'Dokter', nik:'', ihs:'', sip:'', spesialis:'', user_id:'' });
     _renderDokterList();
     const rows = document.querySelectorAll('.dokter-row');
     if (rows.length > 0) rows[rows.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
@@ -862,7 +893,8 @@ function _kumpulkanDokter() {
         nik:       _getVal(`dk_nik_${i}`),
         ihs:       _getVal(`dk_ihs_${i}`),
         sip:       _getVal(`dk_sip_${i}`),
-        spesialis: _getVal(`dk_spesialis_${i}`)
+        spesialis: _getVal(`dk_spesialis_${i}`),
+        user_id:   _getVal(`dk_user_id_${i}`) || null
     })).filter(d => d.nama.trim() !== '');
 }
 
