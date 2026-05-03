@@ -18,6 +18,17 @@ function switchPage(id, navEl) {
     if (id === 'pageHariIni' && filterDate && filterDate.value) fetchByDate();
     if (id === 'pageUser')     fetchUsers();
     if (id === 'pageMedis' && typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
+    if (id === 'pageLaporan') {
+        if (typeof loggedInUser !== 'undefined' && loggedInUser) {
+            const jabatan = (loggedInUser.jabatan || '').toLowerCase();
+            if (jabatan === 'paramedis') {
+                showToast("⛔ Akses Laporan hanya untuk Admin & Dokter", "error");
+                switchPage('pageDaftar', document.getElementById('navDaftar'));
+                return;
+            }
+        }
+        if (typeof initLaporan === 'function') initLaporan();
+    }
     if (id === 'pageSettings') {
         if (typeof loggedInUser !== 'undefined' && loggedInUser) {
             const jabatan = (loggedInUser.jabatan || '').toLowerCase();

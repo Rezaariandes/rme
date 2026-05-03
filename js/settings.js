@@ -79,6 +79,11 @@ const MODULE_DEFINITIONS = [
         id: 'mod_user',
         label: '👥 Manajemen User',
         desc: 'Tambah / edit user & PIN'
+    },
+    {
+        id: 'mod_laporan',
+        label: '📊 Laporan & Statistik',
+        desc: 'Laporan kunjungan per bulan, filter diagnosa & dokter, export CSV'
     }
 ];
 
@@ -86,10 +91,10 @@ const MODULE_DEFINITIONS = [
 const DEFAULT_ACCESS = {
     'Dokter':    ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
                   'mod_pemeriksaan_keluhan','mod_pemeriksaan_fisik','mod_diagnosa','mod_riwayat',
-                  'mod_settings','mod_user'],
+                  'mod_settings','mod_user','mod_laporan'],
     'Admin':     ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
                   'mod_pemeriksaan_keluhan','mod_pemeriksaan_fisik','mod_diagnosa','mod_riwayat',
-                  'mod_settings','mod_user'],
+                  'mod_settings','mod_user','mod_laporan'],
     'Paramedis': ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
                   'mod_riwayat']
 };
@@ -736,6 +741,7 @@ function applyModuleAccess(jabatan) {
     const navMap = {
         'mod_daftar':    'navDaftar',
         'mod_kunjungan': 'navHariIni',
+        'mod_laporan':   'navLaporan',
         'mod_settings':  'navSettings',
         'mod_user':      'navUser'
     };
