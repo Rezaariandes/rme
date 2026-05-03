@@ -18,6 +18,8 @@ function switchPage(id, navEl) {
     if (id === 'pageHariIni' && filterDate && filterDate.value) fetchByDate();
     if (id === 'pageUser')     fetchUsers();
     if (id === 'pageMedis' && typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
+    // BUG FIX: Selalu reset checkbox surat sakit ke unchecked saat masuk pageMedis
+    if (id === 'pageMedis') { const ss = document.getElementById('suratSakit'); if (ss) ss.checked = false; }
     if (id === 'pageLaporan') {
         if (typeof loggedInUser !== 'undefined' && loggedInUser) {
             const jabatan = (loggedInUser.jabatan || '').toLowerCase();
