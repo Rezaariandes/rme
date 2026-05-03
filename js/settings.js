@@ -548,7 +548,7 @@ function applyModuleAccess(jabatan) {
     const sectionMap = {
         'mod_pemeriksaan_keluhan': 'sectionKeluhan',
         'mod_pemeriksaan_fisik':   'sectionFisik',
-        'mod_pemeriksaan_ttv':     'sectionTtv',
+        'mod_pemeriksaan_ttv':     'sectionTTV',
         'mod_pemeriksaan_lab':     'sectionLab',
         'mod_diagnosa':            'sectionDiagnosa',
         'mod_riwayat':             'sectionRiwayat'
@@ -927,15 +927,15 @@ async function testKoneksiSatuSehat() {
         badge.textContent='🔄 Menghubungkan ke Satu Sehat...';
         Object.assign(badge.style, { background:'rgba(59,130,246,0.1)', color:'#1d4ed8', border:'1px solid rgba(59,130,246,0.3)' });
     }
-    // Test Satu Sehat membutuhkan backend proxy karena client_secret tidak boleh diekspos di frontend.
-    // Fitur ini belum tersedia tanpa backend/Edge Function Supabase.
+    // FIX: Test Satu Sehat membutuhkan backend proxy — tidak bisa dilakukan langsung
+    // dari frontend karena client_secret tidak boleh terekspos.
     try {
         if (badge) {
-            badge.textContent = '⚠️ Test koneksi Satu Sehat memerlukan backend proxy. Simpan konfigurasi dan hubungi administrator untuk verifikasi.';
+            badge.textContent = '⚠️ Test koneksi Satu Sehat memerlukan backend proxy (Edge Function). Simpan konfigurasi dan verifikasi melalui administrator.';
             Object.assign(badge.style, { background:'rgba(245,158,11,0.1)', color:'#92400e', border:'1px solid rgba(245,158,11,0.3)' });
         }
     } catch(e) {
-        if (badge) { badge.textContent='❌ Gagal: ' + (e.message||'Cek Client ID & Secret'); Object.assign(badge.style, { background:'rgba(239,68,68,0.1)', color:'#dc2626', border:'1px solid rgba(239,68,68,0.3)' }); }
+        if (badge) { badge.textContent = '❌ Gagal: ' + (e.message || 'Cek Client ID & Secret'); Object.assign(badge.style, { background:'rgba(239,68,68,0.1)', color:'#dc2626', border:'1px solid rgba(239,68,68,0.3)' }); }
     } finally {
         if (btn) { btn.disabled=false; btn.textContent='🔗 Test Koneksi Satu Sehat'; }
     }

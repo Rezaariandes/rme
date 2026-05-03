@@ -157,7 +157,11 @@ async function sb_checkAndUpsertPasien(payload) {
         if (rows.length) pasienRow = rows[0];
     }
     if (!pasienRow) {
-        const rows = await _sbFetch(`pasien?nama=eq.${encodeURIComponent(nama)}&limit=1`);
+        // BUG G FIX: encodeURIComponent benar untuk spasi (%20) tapi karakter & dalam nama
+        // harus di-encode agar tidak break query string. encodeURIComponent sudah handle ini
+        // (& → %26), jadi tetap pakai encodeURIComponent namun pastikan nama di-trim dulu.
+        const namaEncoded = encodeURIComponent((nama || '').trim());
+        const rows = await _sbFetch(`pasien?nama=eq.${namaEncoded}&limit=1`);
         if (rows.length) pasienRow = rows[0];
     }
 
@@ -266,7 +270,8 @@ async function sb_saveKunjungan(payload) {
         keluhan, fisik, diagnosa, diagnosa2, terapi, suratSakit
     } = payload;
 
-    if (pasienId) {
+    // BUG E FIX: Guard — jangan PATCH pasien jika pasienId tidak valid
+    if (pasienId && pasienId !== 'null' && pasienId !== 'undefined') {
         await _sbFetch(`pasien?id=eq.${pasienId}`, {
             method: 'PATCH',
             body: { nama, nik, jk, ...(tgl_lahir && {tgl_lahir}), ...(alamat && {alamat}) },
@@ -274,13 +279,28 @@ async function sb_saveKunjungan(payload) {
         });
     }
 
+    // BUG A FIX: Konversi string kosong '' ke null untuk kolom numerik di Supabase
+    // Supabase menolak '' pada kolom INTEGER/NUMERIC — harus null
+    const _num = v => (v === '' || v === null || v === undefined) ? null : v;
+
     const isSelesai = diagnosa && terapi;
     const body = {
         pasien_id: pasienId, tgl: localDate, waktu: localTime,
-        td, nadi, rr, suhu, bb, tb,
-        lab_gds, lab_chol, lab_ua,
-        keluhan, fisik, diagnosa, diagnosa2: diagnosa2 || null, terapi,
-        surat_sakit: suratSakit,
+        td: td || null,
+        nadi:     _num(nadi),
+        rr:       _num(rr),
+        suhu:     _num(suhu),
+        bb:       _num(bb),
+        tb:       _num(tb),
+        lab_gds:  _num(lab_gds),
+        lab_chol: _num(lab_chol),
+        lab_ua:   _num(lab_ua),
+        keluhan: keluhan || null,
+        fisik:   fisik   || null,
+        diagnosa:  diagnosa  || null,
+        diagnosa2: diagnosa2 || null,
+        terapi:    terapi    || null,
+        surat_sakit: suratSakit || null,
         status: isSelesai ? 'Selesai' : 'Menunggu'
     };
 

@@ -74,6 +74,14 @@ async function loadRuntimeSettings() {
 
         if (data.dokter) window._dokterAktif = data.dokter;
 
+        // BUG F FIX: Terapkan hak akses modul setelah settings dimuat
+        // applyModuleAccess dipanggil di sini (bukan hanya di auth.js) agar
+        // window._isParamedis tersedia sebelum renderKunjunganHariIni dijalankan
+        if (typeof applyModuleAccess === 'function' &&
+            typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.jabatan) {
+            applyModuleAccess(loggedInUser.jabatan);
+        }
+
     } catch (e) {
         console.warn('[Klikpro] Gagal muat runtime settings:', e.message);
     }
@@ -177,7 +185,8 @@ async function initApp() {
         if (typeof clearSession === 'function') clearSession();
     }
 
-    // FIX: loadRuntimeSettings sekarang memakai sb_getSettings (Supabase)
+    // FIX F: loadRuntimeSettings dipanggil SEBELUM sb_initData agar
+    // applyModuleAccess & _isParamedis sudah tersedia saat render pertama.
     try {
         await loadRuntimeSettings();
     } catch(e) {
