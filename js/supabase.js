@@ -43,7 +43,8 @@ async function sb_saveSettings(payload) {
     const keys = ['klinik_nama','klinik_title','klinik_alamat','klinik_telp',
                    'klinik_email','jabatan_medis','ocr_api_key','ss_env',
                    'ss_org_id','ss_client_id','ss_client_secret',
-                   'ai_gemini','ai_groq','ai_openrouter','ai_openai','ai_mistral'];
+                   'ai_gemini','ai_groq','ai_openrouter','ai_openai','ai_mistral',
+                   'module_access']; // FIX: module_access harus di whitelist agar hak akses per jabatan tersimpan ke Supabase
     for (const key of keys) {
         if (payload[key] === undefined) continue;
         if (key === 'ss_client_secret' && !payload[key]) continue;
@@ -129,15 +130,8 @@ async function sb_initData(filterDate) {
         return {
             id: k.id, pasienId: k.pasien_id,
             nama: p.nama || '', waktu: k.waktu, tgl: k.tgl,
-            // FIX: Sertakan semua field kunjungan — sebelumnya hanya td, suhu, keluhan, diag
-            // yang menyebabkan form kosong saat bukaRekamMedisHariIni() dipanggil
-            td: k.td, nadi: k.nadi, suhu: k.suhu, rr: k.rr,
-            bb: k.bb, tb: k.tb,
-            lab_gds: k.lab_gds, lab_chol: k.lab_chol, lab_ua: k.lab_ua,
-            keluhan: k.keluhan, fisik: k.fisik,
-            diag: k.diagnosa, diagnosa2: k.diagnosa2,
-            terapi: k.terapi, surat_sakit: k.surat_sakit,
-            status: k.status || 'Menunggu'
+            td: k.td, suhu: k.suhu, keluhan: k.keluhan,
+            diag: k.diagnosa, status: k.status || 'Menunggu'
         };
     });
 
