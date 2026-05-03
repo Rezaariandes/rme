@@ -256,7 +256,6 @@ async function sb_checkAndUpsertPasien(payload) {
         // Fungsi ginjal
         lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
-        alergi: r.alergi || '',
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
         status: r.status
@@ -330,7 +329,6 @@ async function sb_getKunjunganById(kunjunganId) {
         // Fungsi ginjal
         lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
-        alergi: r.alergi || '',
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
         status: r.status
