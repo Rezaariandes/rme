@@ -81,12 +81,40 @@ async function sb_getUsers() {
 }
 
 async function sb_verifyPin(userId, pin) {
-    const hashed = await _sha256(pin);
-    const rows = await _sbFetch(`users?id=eq.${userId}&pin_hash=eq.${hashed}&select=id,nama,jabatan`);
-    if (rows.length > 0) {
-        return { isValid: true, user: rows[0] };
+    // Ambil data user dulu (tanpa filter pin_hash) agar bisa cek berbagai format
+    const rows = await _sbFetch(`users?id=eq.${userId}&select=id,nama,jabatan,pin_hash`);
+    if (rows.length === 0) return { isValid: false };
+
+    const user      = rows[0];
+    const stored    = (user.pin_hash || '').trim();
+    const sha256hex = await _sha256(pin);
+
+    // Cek semua kemungkinan format penyimpanan PIN:
+    // 1. SHA-256 hex (format baru — 64 karakter)
+    // 2. Plain text (format lama jika GAS tidak meng-hash)
+    const isValid =
+        stored === sha256hex ||   // SHA-256 hex baru
+        stored === pin;           // plain text lama
+
+    if (!isValid) return { isValid: false };
+
+    // Jika cocok tapi masih plain text → upgrade otomatis ke SHA-256
+    if (stored === pin && stored !== sha256hex) {
+        try {
+            await _sbFetch(`users?id=eq.${userId}`, {
+                method:  'PATCH',
+                body:    { pin_hash: sha256hex },
+                prefer:  'return=minimal'
+            });
+            console.log('[Klikpro] PIN di-upgrade ke SHA-256 untuk user:', user.nama);
+        } catch (e) {
+            console.warn('[Klikpro] Gagal upgrade PIN hash:', e.message);
+        }
     }
-    return { isValid: false };
+
+    // Hapus pin_hash dari objek sebelum dikembalikan ke frontend
+    const { pin_hash, ...safeUser } = user;
+    return { isValid: true, user: safeUser };
 }
 
 async function sb_saveUser(payload) {
