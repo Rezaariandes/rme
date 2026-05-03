@@ -38,7 +38,7 @@ function initPinLock() {
 
     const pinScreen = document.getElementById('pinScreen');
     if (pinScreen) pinScreen.style.display = 'flex';
-    
+
     loadLoginUsers();
     updatePinDots();
 }
@@ -48,11 +48,9 @@ async function loadLoginUsers() {
     const select = document.getElementById('loginUserSelect');
     if (!select) return;
     select.innerHTML = '<option value="">Memuat user...</option>';
-    
+
     try {
-        // Menggunakan fungsi dari Supabase Client
         const res = await sb_getUsers();
-        
         select.innerHTML = '';
 
         if (res.status === "success" && res.data && res.data.length > 0) {
@@ -109,12 +107,11 @@ async function checkPinServer() {
 
     const subtitle = document.getElementById('pinSubtitle');
     if (subtitle) {
-        subtitle.innerText    = "Memverifikasi...";
-        subtitle.style.color  = "var(--primary)";
+        subtitle.innerText   = "Memverifikasi...";
+        subtitle.style.color = "var(--primary)";
     }
 
     try {
-        // Menggunakan fungsi verifikasi dari Supabase Client
         const res = await sb_verifyPin(userId, currentPinInput);
 
         if (res.isValid) {
@@ -122,8 +119,8 @@ async function checkPinServer() {
 
             // Sesi 3 jam
             const expiry = Date.now() + (3 * 60 * 60 * 1000);
-            localStorage.setItem('is_unlocked',  'true');
-            localStorage.setItem('logged_user',  JSON.stringify(loggedInUser));
+            localStorage.setItem('is_unlocked',    'true');
+            localStorage.setItem('logged_user',    JSON.stringify(loggedInUser));
             localStorage.setItem('session_expiry', expiry);
 
             if (res.user) {
@@ -147,10 +144,10 @@ async function checkPinServer() {
 function showPinError(msg) {
     const subtitle = document.getElementById('pinSubtitle');
     if (subtitle) { subtitle.innerText = msg; subtitle.style.color = "var(--danger)"; }
-    
+
     const dotsEl = document.getElementById('pinDots');
     if (dotsEl) Array.from(dotsEl.children).forEach(d => d.classList.add('error'));
-    
+
     setTimeout(() => {
         currentPinInput = "";
         updatePinDots();
@@ -169,32 +166,37 @@ function unlockScreen() {
     }
 }
 
-// ── PEMBATASAN AKSES BERDASARKAN JABATAN ──
+// ════════════════════════════════════════════════════════
+//  PEMBATASAN AKSES BERDASARKAN JABATAN
+//  Menggunakan applyModuleAccess() dari settings.js (sistem baru)
+//  + fallback ke logika lama jika settings.js belum load
+// ════════════════════════════════════════════════════════
 function applyRoleRestrictions() {
     if (!loggedInUser) return;
 
-    const jabatan     = loggedInUser.jabatan;
-    const bolehMedis  = JABATAN_MEDIS.includes(jabatan);
+    const jabatan = loggedInUser.jabatan;
+
+    // ── Gunakan sistem hak akses per-modul dari settings.js ──
+    if (typeof applyModuleAccess === 'function') {
+        applyModuleAccess(jabatan);
+        return;
+    }
+
+    // ── FALLBACK LAMA: jika settings.js belum tersedia ──
+    const bolehMedis  = (typeof JABATAN_MEDIS !== 'undefined')
+                        ? JABATAN_MEDIS.includes(jabatan)
+                        : true;
     const isParamedis = jabatan === 'Paramedis';
 
     // Tombol lanjut periksa
     const btnNext = document.getElementById('btnNext');
     if (btnNext) btnNext.style.display = bolehMedis ? '' : 'none';
 
-    // Seksi klinis disembunyikan untuk Paramedis
+    // Sub-seksi klinis
     const sectionKlinis = document.getElementById('sectionKlinis');
-    if (sectionKlinis) {
-        sectionKlinis.style.display = isParamedis ? 'none' : 'block';
-    }
+    if (sectionKlinis) sectionKlinis.style.display = isParamedis ? 'none' : '';
 
-    // ── PERAWAT: Sembunyikan diagnosa di form ──
-    const diagnosaEl = document.querySelector('#diagnosa');
-    if (diagnosaEl) {
-        const rowDiagnosa = diagnosaEl.closest('.row');
-        if (rowDiagnosa) rowDiagnosa.style.display = isParamedis ? 'none' : '';
-    }
-
-    // ── PERAWAT: Sembunyikan nav item halaman User ──
+    // Sembunyikan nav User untuk Paramedis
     document.querySelectorAll('.nav-item').forEach(navEl => {
         const onclick = navEl.getAttribute('onclick') || '';
         if (onclick.includes('pageUser')) {
@@ -202,7 +204,6 @@ function applyRoleRestrictions() {
         }
     });
 
-    // Simpan flag ke window supaya bisa diakses modul lain (render riwayat, dll.)
     window._isParamedis = isParamedis;
 
     if (!bolehMedis && localStorage.getItem('activePage') === 'pageMedis') {
@@ -226,8 +227,20 @@ function canAccessMedis() {
         if (typeof showToast === 'function') showToast("⛔ Anda belum login.", "error");
         return false;
     }
-    if (!JABATAN_MEDIS.includes(loggedInUser.jabatan)) {
-        if (typeof showToast === 'function') showToast("⛔ Akses ditolak. Hanya Dokter, Admin & Paramedis.", "error");
+    // Cek lewat currentAccess jika sudah load dari settings.js
+    if (window._currentAccess) {
+        if (!window._currentAccess.includes('mod_pemeriksaan_ttv') &&
+            !window._currentAccess.includes('mod_diagnosa')) {
+            if (typeof showToast === 'function')
+                showToast("⛔ Akses ditolak untuk jabatan " + loggedInUser.jabatan, "error");
+            return false;
+        }
+        return true;
+    }
+    // Fallback lama
+    if (typeof JABATAN_MEDIS !== 'undefined' && !JABATAN_MEDIS.includes(loggedInUser.jabatan)) {
+        if (typeof showToast === 'function')
+            showToast("⛔ Akses ditolak. Hanya Dokter, Admin & Paramedis.", "error");
         return false;
     }
     return true;
