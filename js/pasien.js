@@ -175,6 +175,29 @@ function _isiFormDariKunjungan(h) {
     if ($('lab_gds'))  $('lab_gds').value  = h.lab_gds  || '';
     if ($('lab_chol')) $('lab_chol').value = h.lab_chol || '';
     if ($('lab_ua'))   $('lab_ua').value   = h.lab_ua   || '';
+    // Darah rutin
+    if ($('lab_hb'))          $('lab_hb').value          = h.lab_hb          || '';
+    if ($('lab_trombosit'))   $('lab_trombosit').value   = h.lab_trombosit   || '';
+    if ($('lab_leukosit'))    $('lab_leukosit').value    = h.lab_leukosit    || '';
+    if ($('lab_eritrosit'))   $('lab_eritrosit').value   = h.lab_eritrosit   || '';
+    if ($('lab_hematokrit'))  $('lab_hematokrit').value  = h.lab_hematokrit  || '';
+    // Triple eliminasi
+    if ($('lab_hiv'))         $('lab_hiv').value         = h.lab_hiv         || '';
+    if ($('lab_sifilis'))     $('lab_sifilis').value     = h.lab_sifilis     || '';
+    if ($('lab_hepatitis'))   $('lab_hepatitis').value   = h.lab_hepatitis   || '';
+    // Profil lemak
+    if ($('lab_hdl'))   $('lab_hdl').value   = h.lab_hdl   || '';
+    if ($('lab_ldl'))   $('lab_ldl').value   = h.lab_ldl   || '';
+    if ($('lab_tg'))    $('lab_tg').value    = h.lab_tg    || '';
+    // Gula darah
+    if ($('lab_gdp'))   $('lab_gdp').value   = h.lab_gdp   || '';
+    if ($('lab_hba1c')) $('lab_hba1c').value = h.lab_hba1c || '';
+    // Fungsi hati
+    if ($('lab_sgot'))  $('lab_sgot').value  = h.lab_sgot  || '';
+    if ($('lab_sgpt'))  $('lab_sgpt').value  = h.lab_sgpt  || '';
+    // Fungsi ginjal
+    if ($('lab_ureum'))     $('lab_ureum').value     = h.lab_ureum     || '';
+    if ($('lab_creatinin')) $('lab_creatinin').value = h.lab_creatinin || '';
     if ($('keluhan')) $('keluhan').value = h.keluhan || '';
     if ($('fisik'))   $('fisik').value   = h.fisik   || '';
 

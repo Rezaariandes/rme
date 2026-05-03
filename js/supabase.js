@@ -207,7 +207,22 @@ async function sb_checkAndUpsertPasien(payload) {
         id: r.id, tgl: r.tgl, waktu: r.waktu,
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
+        // Lab dasar
         lab_gds: r.lab_gds, lab_chol: r.lab_chol, lab_ua: r.lab_ua,
+        // Darah rutin
+        lab_hb: r.lab_hb, lab_trombosit: r.lab_trombosit,
+        lab_leukosit: r.lab_leukosit, lab_eritrosit: r.lab_eritrosit,
+        lab_hematokrit: r.lab_hematokrit,
+        // Triple eliminasi
+        lab_hiv: r.lab_hiv, lab_sifilis: r.lab_sifilis, lab_hepatitis: r.lab_hepatitis,
+        // Profil lemak
+        lab_hdl: r.lab_hdl, lab_ldl: r.lab_ldl, lab_tg: r.lab_tg,
+        // Gula darah
+        lab_gdp: r.lab_gdp, lab_hba1c: r.lab_hba1c,
+        // Fungsi hati
+        lab_sgot: r.lab_sgot, lab_sgpt: r.lab_sgpt,
+        // Fungsi ginjal
+        lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
@@ -253,7 +268,22 @@ async function sb_getKunjunganById(kunjunganId) {
         id: r.id, pasien_id: r.pasien_id, tgl: r.tgl, waktu: r.waktu,
         td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr,
         bb: r.bb, tb: r.tb,
+        // Lab dasar
         lab_gds: r.lab_gds, lab_chol: r.lab_chol, lab_ua: r.lab_ua,
+        // Darah rutin
+        lab_hb: r.lab_hb, lab_trombosit: r.lab_trombosit,
+        lab_leukosit: r.lab_leukosit, lab_eritrosit: r.lab_eritrosit,
+        lab_hematokrit: r.lab_hematokrit,
+        // Triple eliminasi
+        lab_hiv: r.lab_hiv, lab_sifilis: r.lab_sifilis, lab_hepatitis: r.lab_hepatitis,
+        // Profil lemak
+        lab_hdl: r.lab_hdl, lab_ldl: r.lab_ldl, lab_tg: r.lab_tg,
+        // Gula darah
+        lab_gdp: r.lab_gdp, lab_hba1c: r.lab_hba1c,
+        // Fungsi hati
+        lab_sgot: r.lab_sgot, lab_sgpt: r.lab_sgpt,
+        // Fungsi ginjal
+        lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
@@ -267,6 +297,12 @@ async function sb_saveKunjungan(payload) {
         nama, nik, tgl_lahir, jk, alamat,
         td, nadi, rr, suhu, bb, tb,
         lab_gds, lab_chol, lab_ua,
+        lab_hb, lab_trombosit, lab_leukosit, lab_eritrosit, lab_hematokrit,
+        lab_hiv, lab_sifilis, lab_hepatitis,
+        lab_hdl, lab_ldl, lab_tg,
+        lab_gdp, lab_hba1c,
+        lab_sgot, lab_sgpt,
+        lab_ureum, lab_creatinin,
         keluhan, fisik, diagnosa, diagnosa2, terapi, suratSakit
     } = payload;
 
@@ -292,9 +328,33 @@ async function sb_saveKunjungan(payload) {
         suhu:     _num(suhu),
         bb:       _num(bb),
         tb:       _num(tb),
+        // Lab dasar
         lab_gds:  _num(lab_gds),
         lab_chol: _num(lab_chol),
         lab_ua:   _num(lab_ua),
+        // Darah rutin
+        lab_hb:          _num(lab_hb),
+        lab_trombosit:   _num(lab_trombosit),
+        lab_leukosit:    _num(lab_leukosit),
+        lab_eritrosit:   _num(lab_eritrosit),
+        lab_hematokrit:  _num(lab_hematokrit),
+        // Triple eliminasi (TEXT — non-reaktif/reaktif)
+        lab_hiv:      lab_hiv      || null,
+        lab_sifilis:  lab_sifilis  || null,
+        lab_hepatitis:lab_hepatitis|| null,
+        // Profil lemak
+        lab_hdl: _num(lab_hdl),
+        lab_ldl: _num(lab_ldl),
+        lab_tg:  _num(lab_tg),
+        // Gula darah
+        lab_gdp:   _num(lab_gdp),
+        lab_hba1c: _num(lab_hba1c),
+        // Fungsi hati
+        lab_sgot: _num(lab_sgot),
+        lab_sgpt: _num(lab_sgpt),
+        // Fungsi ginjal
+        lab_ureum:    _num(lab_ureum),
+        lab_creatinin:_num(lab_creatinin),
         keluhan: keluhan || null,
         fisik:   fisik   || null,
         diagnosa:  diagnosa  || null,

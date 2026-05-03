@@ -252,6 +252,29 @@ async function saveAll() {
         lab_gds:  _num('lab_gds'),
         lab_chol: _num('lab_chol'),
         lab_ua:   _num('lab_ua'),
+        // Darah rutin
+        lab_hb:          _num('lab_hb'),
+        lab_trombosit:   _num('lab_trombosit'),
+        lab_leukosit:    _num('lab_leukosit'),
+        lab_eritrosit:   _num('lab_eritrosit'),
+        lab_hematokrit:  _num('lab_hematokrit'),
+        // Triple eliminasi
+        lab_hiv:       $('lab_hiv')      ? $('lab_hiv').value      : null,
+        lab_sifilis:   $('lab_sifilis')  ? $('lab_sifilis').value  : null,
+        lab_hepatitis: $('lab_hepatitis')? $('lab_hepatitis').value : null,
+        // Profil lemak
+        lab_hdl: _num('lab_hdl'),
+        lab_ldl: _num('lab_ldl'),
+        lab_tg:  _num('lab_tg'),
+        // Gula darah
+        lab_gdp:   _num('lab_gdp'),
+        lab_hba1c: _num('lab_hba1c'),
+        // Fungsi hati
+        lab_sgot: _num('lab_sgot'),
+        lab_sgpt: _num('lab_sgpt'),
+        // Fungsi ginjal
+        lab_ureum:    _num('lab_ureum'),
+        lab_creatinin:_num('lab_creatinin'),
         keluhan:  $('keluhan')  ? $('keluhan').value  : '',
         fisik:    $('fisik')    ? $('fisik').value    : '',
         // BUG B FIX: diagnosa1 & diagnosa2 dikirim terpisah (bukan digabung dengan |)
