@@ -31,10 +31,10 @@ function switchPage(id, navEl) {
     }
 }
 
-// ── MUAT KONFIGURASI AWAL DARI SERVER (setelah login) ──
+// ── MUAT KONFIGURASI AWAL DARI SUPABASE (setelah login) ──
 async function loadRuntimeSettings() {
     try {
-        // PERBAIKAN: Menggunakan fungsi Supabase Client alih-alih fetch() ke APP_URL
+        // Menggunakan fungsi dari Supabase Client
         const data = await sb_getSettings(); 
         
         if (data.status !== "success" || !data.settings) return;
@@ -105,7 +105,9 @@ async function initApp() {
     const filterDate = document.getElementById('filterDate');
     if (filterDate) filterDate.value = localISOTime;
 
-    document.body.appendChild(buildColorSwitcher());
+    if (typeof buildColorSwitcher === 'function') {
+        document.body.appendChild(buildColorSwitcher());
+    }
 
     if (typeof populateIcd10   === 'function') populateIcd10('list-icd');
     if (typeof initScanKtp     === 'function') initScanKtp();
@@ -117,18 +119,19 @@ async function initApp() {
         });
     });
 
-    const bbEl      = $('bb');
-    const tbEl      = $('tb');
-    const sistolEl  = $('sistol');
-    const diastolEl = $('diastol');
-    if (bbEl)      bbEl.addEventListener('input', calculateIMT);
-    if (tbEl)      tbEl.addEventListener('input', calculateIMT);
-    if (sistolEl)  sistolEl.addEventListener('input', checkTensi);
-    if (diastolEl) diastolEl.addEventListener('input', checkTensi);
+    const bbEl      = document.getElementById('bb');
+    const tbEl      = document.getElementById('tb');
+    const sistolEl  = document.getElementById('sistol');
+    const diastolEl = document.getElementById('diastol');
+    
+    if (bbEl && typeof calculateIMT === 'function') bbEl.addEventListener('input', calculateIMT);
+    if (tbEl && typeof calculateIMT === 'function') tbEl.addEventListener('input', calculateIMT);
+    if (sistolEl && typeof checkTensi === 'function') sistolEl.addEventListener('input', checkTensi);
+    if (diastolEl && typeof checkTensi === 'function') diastolEl.addEventListener('input', checkTensi);
 
     ['lab_gds','lab_chol','lab_ua'].forEach(id => {
-        const el = $(id);
-        if (el) el.addEventListener('input', checkLabAlert);
+        const el = document.getElementById(id);
+        if (el && typeof checkLabAlert === 'function') el.addEventListener('input', checkLabAlert);
     });
 
     if (localStorage.getItem('activePage') === 'pageMedis') {
@@ -136,12 +139,17 @@ async function initApp() {
         currentKunjunganId = localStorage.getItem('cK_id');
         if (currentKunjunganId === "null") currentKunjunganId = null;
 
-        if ($('infoPasienNama'))     $('infoPasienNama').innerText     = localStorage.getItem('cP_nama')  || '—';
-        if ($('infoPasienNik'))      $('infoPasienNik').innerText      = localStorage.getItem('cP_nik')   || 'NIK: —';
-        if ($('infoPasienUmur'))     $('infoPasienUmur').innerText     = localStorage.getItem('cP_umur')  || 'Umur: -';
-        if ($('infoTglPemeriksaan')) {
-            $('infoTglPemeriksaan').innerText     = localStorage.getItem('cTglEdit') || 'Tgl: -';
-            $('infoTglPemeriksaan').style.display = 'block';
+        const infoPasienNama = document.getElementById('infoPasienNama');
+        const infoPasienNik  = document.getElementById('infoPasienNik');
+        const infoPasienUmur = document.getElementById('infoPasienUmur');
+        const infoTglPemeriksaan = document.getElementById('infoTglPemeriksaan');
+
+        if (infoPasienNama)     infoPasienNama.innerText     = localStorage.getItem('cP_nama')  || '—';
+        if (infoPasienNik)      infoPasienNik.innerText      = localStorage.getItem('cP_nik')   || 'NIK: —';
+        if (infoPasienUmur)     infoPasienUmur.innerText     = localStorage.getItem('cP_umur')  || 'Umur: -';
+        if (infoTglPemeriksaan) {
+            infoTglPemeriksaan.innerText     = localStorage.getItem('cTglEdit') || 'Tgl: -';
+            infoTglPemeriksaan.style.display = 'block';
         }
 
         try {
@@ -153,9 +161,9 @@ async function initApp() {
         }
 
         if (typeof loadAutosave === 'function') loadAutosave();
-        calculateIMT();
-        checkTensi();
-        checkLabAlert();
+        if (typeof calculateIMT === 'function') calculateIMT();
+        if (typeof checkTensi === 'function') checkTensi();
+        if (typeof checkLabAlert === 'function') checkLabAlert();
 
         switchPage('pageMedis', null);
     } else {
@@ -163,29 +171,23 @@ async function initApp() {
     }
 
     // ── FIX RACE CONDITION ──
-    // loadRuntimeSettings dijalankan DULU (await), baru initData.
-    // Ini menjamin AI_KEYS & OCR_API_KEY sudah terisi sebelum UI aktif,
-    // sehingga user tidak bisa klik Rekomendasi AI sebelum key tersedia.
     try {
         await loadRuntimeSettings();
     } catch(e) {
         console.warn('[Klikpro] Settings gagal, lanjut dengan default');
     }
 
-    // Ambil data awal dari server
+    // ── Ambil data awal dari Supabase ──
     try {
-        const res  = await fetch(APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "initData", filterDate: localISOTime })
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
+        const data = await sb_initData(localISOTime);
 
         allPatients      = data.pasien   || [];
         kunjunganHariIni = data.hariIni  || [];
 
         const listPasien = document.getElementById('list-pasien');
         if (listPasien && allPatients.length > 0) {
+            // Bersihkan list sebelum diisi agar tidak bertumpuk
+            listPasien.innerHTML = '';
             allPatients.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.nama;
@@ -196,6 +198,9 @@ async function initApp() {
         if (typeof renderKunjunganHariIni === 'function') renderKunjunganHariIni();
 
     } catch (e) {
-        showToast("⚡ Gagal terhubung ke server. Cek koneksi.", "error");
+        console.error("Gagal init data:", e);
+        if (typeof showToast === 'function') {
+            showToast("⚡ Gagal memuat data dari database. Cek koneksi.", "error");
+        }
     }
 }
