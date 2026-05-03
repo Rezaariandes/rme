@@ -906,9 +906,21 @@ function konfirmasiHapusDokter(i, nama) {
     }
 }
 
-function hapusDokterRow(i) {
+async function hapusDokterRow(i) {
     _dokterList.splice(i, 1);
     _renderDokterList();
+
+    // Auto-save langsung ke Supabase agar tidak muncul lagi saat reload
+    try {
+        showSettingsBanner("⏳ Menyimpan perubahan...", "info");
+        await sb_saveSettings({ dokter: JSON.stringify(_dokterList) });
+        window._dokterAktif = _dokterList;
+        showSettingsBanner("✅ Dokter berhasil dihapus", "success");
+        setTimeout(() => hideSettingsBanner(), 2000);
+    } catch(e) {
+        showSettingsBanner("❌ Gagal menyimpan: " + (e.message || 'Cek koneksi'), "error");
+        showToast("❌ Hapus gagal disimpan ke server", "error");
+    }
 }
 
 function _kumpulkanDokter() {
