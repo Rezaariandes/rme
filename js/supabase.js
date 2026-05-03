@@ -44,7 +44,7 @@ async function sb_saveSettings(payload) {
                    'klinik_email','jabatan_medis','ocr_api_key','ss_env',
                    'ss_org_id','ss_client_id','ss_client_secret',
                    'ai_gemini','ai_groq','ai_openrouter','ai_openai','ai_mistral',
-                   'module_access'];
+                   'module_access','lab_aktif'];
     for (const key of keys) {
         if (payload[key] === undefined) continue;
         if (key === 'ss_client_secret' && !payload[key]) continue;

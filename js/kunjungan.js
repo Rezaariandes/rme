@@ -333,3 +333,107 @@ function renderRiwayatList(riwayatArr, containerId) {
         c.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div>Belum ada riwayat.</div>`;
     }
 }
+
+// ════════════════════════════════════════════════════════
+//  DYNAMIC LAB SECTION — render berdasarkan window._labAktif
+// ════════════════════════════════════════════════════════
+
+// Definisi lengkap semua field lab (mirror dari settings.js LAB_GROUPS)
+const ALL_LAB_FIELDS = [
+    { id: 'lab_gds',       label: 'GDS',           unit: 'mg/dL',    step: '1',   group: 'dasar' },
+    { id: 'lab_chol',      label: 'Kolesterol',     unit: 'mg/dL',    step: '1',   group: 'dasar' },
+    { id: 'lab_ua',        label: 'Asam Urat',      unit: 'mg/dL',    step: '0.1', group: 'dasar' },
+    { id: 'lab_hb',        label: 'HB',             unit: 'g/dL',     step: '0.1', group: 'darah_rutin' },
+    { id: 'lab_trombosit', label: 'Trombosit',      unit: 'ribu/µL',  step: '1',   group: 'darah_rutin' },
+    { id: 'lab_leukosit',  label: 'Leukosit',       unit: 'ribu/µL',  step: '0.1', group: 'darah_rutin' },
+    { id: 'lab_eritrosit', label: 'Eritrosit',      unit: 'juta/µL',  step: '0.01',group: 'darah_rutin' },
+    { id: 'lab_hematokrit',label: 'Hematokrit',     unit: '%',        step: '0.1', group: 'darah_rutin' },
+    { id: 'lab_hiv',       label: 'HIV',            unit: 'hasil',    step: null,  group: 'triple', type: 'select', opts: ['—','Non-Reaktif','Reaktif'] },
+    { id: 'lab_sifilis',   label: 'Sifilis',        unit: 'hasil',    step: null,  group: 'triple', type: 'select', opts: ['—','Non-Reaktif','Reaktif'] },
+    { id: 'lab_hepatitis', label: 'Hepatitis B',    unit: 'hasil',    step: null,  group: 'triple', type: 'select', opts: ['—','Non-Reaktif','Reaktif'] },
+    { id: 'lab_hdl',       label: 'HDL',            unit: 'mg/dL',    step: '1',   group: 'lemak' },
+    { id: 'lab_ldl',       label: 'LDL',            unit: 'mg/dL',    step: '1',   group: 'lemak' },
+    { id: 'lab_tg',        label: 'Trigliserida',   unit: 'mg/dL',    step: '1',   group: 'lemak' },
+    { id: 'lab_gdp',       label: 'GDP',            unit: 'mg/dL',    step: '1',   group: 'gula' },
+    { id: 'lab_hba1c',     label: 'HbA1c',          unit: '%',        step: '0.1', group: 'gula' },
+    { id: 'lab_sgot',      label: 'SGOT',           unit: 'U/L',      step: '1',   group: 'hati' },
+    { id: 'lab_sgpt',      label: 'SGPT',           unit: 'U/L',      step: '1',   group: 'hati' },
+    { id: 'lab_ureum',     label: 'Ureum',          unit: 'mg/dL',    step: '1',   group: 'ginjal' },
+    { id: 'lab_creatinin', label: 'Kreatinin',      unit: 'mg/dL',    step: '0.01',group: 'ginjal' },
+];
+
+// Grup label untuk tampilan
+const LAB_GROUP_LABELS = {
+    dasar:       '🩸 Lab Dasar',
+    darah_rutin: '🔴 Darah Rutin',
+    triple:      '🧬 Triple Eliminasi',
+    lemak:       '💧 Profil Lemak',
+    gula:        '🍬 Gula Darah',
+    hati:        '🫀 Fungsi Hati',
+    ginjal:      '🫘 Fungsi Ginjal',
+};
+
+function _renderSectionLabDinamic() {
+    const section = $('sectionLab');
+    if (!section) return;
+
+    const labAktif = window._labAktif || { lab_gds: true, lab_chol: true, lab_ua: true };
+    const activeFields = ALL_LAB_FIELDS.filter(f => labAktif[f.id]);
+
+    if (activeFields.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = '';
+
+    // Kelompokkan per group
+    const grouped = {};
+    activeFields.forEach(f => {
+        if (!grouped[f.group]) grouped[f.group] = [];
+        grouped[f.group].push(f);
+    });
+
+    let html = `<div class="section-divider"><span>🔬 Hasil Laboratorium</span></div>`;
+
+    Object.entries(grouped).forEach(([grp, fields]) => {
+        html += `<div style="margin-bottom:10px;">`;
+        if (Object.keys(grouped).length > 1) {
+            html += `<div style="font-size:10px;font-weight:700;color:var(--primary,#2563eb);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">${LAB_GROUP_LABELS[grp] || grp}</div>`;
+        }
+        html += `<div class="row g-2">`;
+        fields.forEach(f => {
+            const colClass = fields.length === 1 ? 'col-6' : 'col-4';
+            if (f.type === 'select') {
+                html += `<div class="${colClass}"><div class="ttv-item">
+                    <label>${f.label} <span style="font-size:9px;font-weight:500;color:var(--text-muted);">(${f.unit})</span></label>
+                    <select id="${f.id}" class="form-control" data-save="true" style="font-size:12px;padding:4px 6px;height:36px;">
+                        ${(f.opts||[]).map(o => `<option value="${o === '—' ? '' : o}">${o}</option>`).join('')}
+                    </select>
+                </div></div>`;
+            } else {
+                html += `<div class="${colClass}"><div class="ttv-item">
+                    <label>${f.label} <span style="font-size:9px;font-weight:500;color:var(--text-muted);">(${f.unit})</span></label>
+                    <input type="number" id="${f.id}" placeholder="—" data-save="true" step="${f.step || 1}">
+                </div></div>`;
+            }
+        });
+        html += `</div></div>`;
+    });
+
+    html += `<div id="labAlert" style="display:none;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;margin-bottom:10px;background:rgba(239,68,68,0.09);color:#dc2626;border:1px solid rgba(239,68,68,0.25);"></div>`;
+
+    section.innerHTML = html;
+
+    // Re-bind autosave & event listeners untuk field baru
+    section.querySelectorAll('[data-save="true"]').forEach(el => {
+        el.addEventListener('input', () => {
+            localStorage.setItem('rme_' + el.id, el.value);
+            checkLabAlert();
+        });
+        // Restore nilai dari localStorage
+        const saved = localStorage.getItem('rme_' + el.id);
+        if (saved !== null) el.value = saved;
+    });
+
+    checkLabAlert();
+}

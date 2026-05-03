@@ -17,6 +17,7 @@ function switchPage(id, navEl) {
     const filterDate = document.getElementById('filterDate');
     if (id === 'pageHariIni' && filterDate && filterDate.value) fetchByDate();
     if (id === 'pageUser')     fetchUsers();
+    if (id === 'pageMedis' && typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
     if (id === 'pageSettings') {
         if (typeof loggedInUser !== 'undefined' && loggedInUser) {
             const jabatan = (loggedInUser.jabatan || '').toLowerCase();
@@ -73,6 +74,17 @@ async function loadRuntimeSettings() {
         });
 
         if (data.dokter) window._dokterAktif = data.dokter;
+
+        // Load lab aktif ke window global agar page-medis bisa pakai sebelum settings dibuka
+        if (s.lab_aktif) {
+            try {
+                window._labAktif = JSON.parse(s.lab_aktif);
+            } catch(e) {
+                window._labAktif = { lab_gds: true, lab_chol: true, lab_ua: true };
+            }
+        } else {
+            window._labAktif = { lab_gds: true, lab_chol: true, lab_ua: true };
+        }
 
         // BUG F FIX: Terapkan hak akses modul setelah settings dimuat
         // applyModuleAccess dipanggil di sini (bukan hanya di auth.js) agar
@@ -189,6 +201,8 @@ async function initApp() {
     // applyModuleAccess & _isParamedis sudah tersedia saat render pertama.
     try {
         await loadRuntimeSettings();
+        // Render dynamic lab section setelah lab_aktif tersedia
+        if (typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
     } catch(e) {
         console.warn('[Klikpro] Settings gagal, lanjut dengan default');
     }

@@ -98,9 +98,8 @@ function _renderSettingsPage() {
     container.innerHTML = `
     <div class="page-settings-wrap">
 
-      <!-- Banner Status -->
-      <div id="settingsBanner" style="display:none; margin:0 0 12px; padding:10px 14px;
-           border-radius:10px; font-size:12px; font-weight:600; border:1px solid transparent;"></div>
+      <!-- Banner Status (floating center) -->
+      <div id="settingsBanner" style="display:none;"></div>
 
       <!-- ═══ SEKSI 1: IDENTITAS KLINIK ═══ -->
       ${_buildAccordion('sec_klinik', '🏥 Identitas Klinik',
@@ -121,6 +120,13 @@ function _renderSettingsPage() {
           'Daftar dokter & tenaga medis untuk cetak resep & Satu Sehat',
           _htmlDokterSection(),
           'dokter'
+      )}
+
+      <!-- ═══ SEKSI 3b: LABORATORIUM ═══ -->
+      ${_buildAccordion('sec_lab', '🧪 Jenis Pemeriksaan Laboratorium',
+          'Aktifkan jenis lab yang tersedia — akan muncul di halaman pemeriksaan medis',
+          _htmlLabSection(),
+          'lab'
       )}
 
       <!-- ═══ SEKSI 4: KONFIGURASI AI ═══ -->
@@ -258,6 +264,178 @@ function _htmlIdentitasKlinik() {
 }
 
 // ────────────────────────────────────────
+//  HTML SEKSI: LABORATORIUM
+// ────────────────────────────────────────
+const LAB_GROUPS = [
+    {
+        id: 'lab_dasar',
+        label: '🩸 Lab Dasar',
+        items: [
+            { id: 'lab_gds',  label: 'GDS (Gula Darah Sewaktu)',   unit: 'mg/dL' },
+            { id: 'lab_chol', label: 'Kolesterol Total',            unit: 'mg/dL' },
+            { id: 'lab_ua',   label: 'Asam Urat',                  unit: 'mg/dL' }
+        ]
+    },
+    {
+        id: 'lab_darah_rutin',
+        label: '🔴 Darah Rutin',
+        items: [
+            { id: 'lab_hb',         label: 'Hemoglobin (HB)',   unit: 'g/dL' },
+            { id: 'lab_trombosit',  label: 'Trombosit',         unit: 'ribu/µL' },
+            { id: 'lab_leukosit',   label: 'Leukosit',          unit: 'ribu/µL' },
+            { id: 'lab_eritrosit',  label: 'Eritrosit',         unit: 'juta/µL' },
+            { id: 'lab_hematokrit', label: 'Hematokrit',        unit: '%' }
+        ]
+    },
+    {
+        id: 'lab_triple_eliminasi',
+        label: '🧬 Triple Eliminasi',
+        items: [
+            { id: 'lab_hiv',       label: 'HIV',       unit: 'reaktif/non' },
+            { id: 'lab_sifilis',   label: 'Sifilis',   unit: 'reaktif/non' },
+            { id: 'lab_hepatitis', label: 'Hepatitis B', unit: 'reaktif/non' }
+        ]
+    },
+    {
+        id: 'lab_profil_lemak',
+        label: '💧 Profil Lemak',
+        items: [
+            { id: 'lab_hdl',   label: 'HDL',               unit: 'mg/dL' },
+            { id: 'lab_ldl',   label: 'LDL',               unit: 'mg/dL' },
+            { id: 'lab_tg',    label: 'Trigliserida',       unit: 'mg/dL' }
+        ]
+    },
+    {
+        id: 'lab_gula_darah',
+        label: '🍬 Gula Darah',
+        items: [
+            { id: 'lab_gdp',   label: 'GDP (Gula Darah Puasa)', unit: 'mg/dL' },
+            { id: 'lab_hba1c', label: 'HbA1c',                  unit: '%' }
+        ]
+    },
+    {
+        id: 'lab_fungsi_hati',
+        label: '🫀 Fungsi Hati',
+        items: [
+            { id: 'lab_sgot', label: 'SGOT', unit: 'U/L' },
+            { id: 'lab_sgpt', label: 'SGPT', unit: 'U/L' }
+        ]
+    },
+    {
+        id: 'lab_fungsi_ginjal',
+        label: '🫘 Fungsi Ginjal',
+        items: [
+            { id: 'lab_ureum',    label: 'Ureum',    unit: 'mg/dL' },
+            { id: 'lab_creatinin',label: 'Kreatinin', unit: 'mg/dL' }
+        ]
+    }
+];
+
+// State: lab yang aktif (diambil/disimpan ke DB)
+let _labAktif = {};  // { lab_gds: true, lab_hb: false, ... }
+
+function _htmlLabSection() {
+    return `
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;padding:8px 10px;background:rgba(var(--primary-rgb,37,99,235),0.05);border-radius:8px;">
+        💡 Aktifkan pemeriksaan lab yang tersedia di klinik Anda. Item yang diaktifkan akan muncul sebagai input di halaman Pemeriksaan Medis.
+    </div>
+    <div id="labGroupsContainer">
+        ${LAB_GROUPS.map(g => `
+        <div style="margin-bottom:12px;border:1px solid rgba(var(--primary-rgb,37,99,235),0.1);border-radius:10px;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(var(--primary-rgb,37,99,235),0.04);cursor:pointer;"
+                 onclick="toggleLabGroup('${g.id}')">
+                <span style="font-size:12px;font-weight:700;color:var(--text-primary,#1e293b);">${g.label}</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="labgrp_count_${g.id}" style="font-size:10px;font-weight:600;color:var(--primary,#2563eb);background:rgba(var(--primary-rgb,37,99,235),0.1);padding:2px 8px;border-radius:20px;">0 aktif</span>
+                    <span id="labgrp_arrow_${g.id}" style="font-size:10px;color:var(--primary,#2563eb);">▶</span>
+                </div>
+            </div>
+            <div id="labgrp_body_${g.id}" style="display:none;padding:10px 12px;">
+                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                    <button class="btn-small-secondary" onclick="toggleAllLabGroup('${g.id}', true)">✅ Aktifkan Semua</button>
+                    <button class="btn-small-secondary" onclick="toggleAllLabGroup('${g.id}', false)">⬜ Nonaktifkan</button>
+                </div>
+                ${g.items.map(item => `
+                <label style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;border:1px solid rgba(var(--primary-rgb,37,99,235),0.08);margin-bottom:5px;cursor:pointer;transition:background 0.15s;"
+                       id="labitem_label_${item.id}"
+                       class="lab-toggle-item">
+                    <input type="checkbox" id="labtog_${item.id}" style="width:16px;height:16px;accent-color:var(--primary,#2563eb);"
+                           onchange="_onLabToggle('${g.id}', '${item.id}', this.checked, this)">
+                    <div style="flex:1;">
+                        <div style="font-size:12px;font-weight:600;color:var(--text-primary,#1e293b);">${item.label}</div>
+                        <div style="font-size:10px;color:var(--text-muted,#64748b);">Satuan: ${item.unit}</div>
+                    </div>
+                    <span id="labtog_badge_${item.id}" style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#e2e8f0;color:#64748b;">OFF</span>
+                </label>`).join('')}
+            </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function toggleLabGroup(groupId) {
+    const body  = $(`labgrp_body_${groupId}`);
+    const arrow = $(`labgrp_arrow_${groupId}`);
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+}
+
+function toggleAllLabGroup(groupId, active) {
+    const group = LAB_GROUPS.find(g => g.id === groupId);
+    if (!group) return;
+    group.items.forEach(item => {
+        _labAktif[item.id] = active;
+        const chk = $(`labtog_${item.id}`);
+        if (chk) chk.checked = active;
+        _updateLabItemVisual(item.id, active);
+    });
+    _updateLabGroupCount(groupId);
+}
+
+function _onLabToggle(groupId, itemId, checked, el) {
+    _labAktif[itemId] = checked;
+    _updateLabItemVisual(itemId, checked);
+    _updateLabGroupCount(groupId);
+}
+
+function _updateLabItemVisual(itemId, active) {
+    const label = $(`labitem_label_${itemId}`);
+    const badge = $(`labtog_badge_${itemId}`);
+    if (label) label.style.background = active ? 'rgba(var(--primary-rgb,37,99,235),0.06)' : '';
+    if (badge) {
+        badge.textContent = active ? 'ON' : 'OFF';
+        badge.style.background = active ? 'rgba(5,150,105,0.15)' : '#e2e8f0';
+        badge.style.color      = active ? '#065f46' : '#64748b';
+    }
+}
+
+function _updateLabGroupCount(groupId) {
+    const group = LAB_GROUPS.find(g => g.id === groupId);
+    if (!group) return;
+    const count = group.items.filter(item => _labAktif[item.id]).length;
+    const el = $(`labgrp_count_${groupId}`);
+    if (el) el.textContent = `${count} aktif`;
+}
+
+function _renderLabToggles() {
+    LAB_GROUPS.forEach(g => {
+        g.items.forEach(item => {
+            const chk = $(`labtog_${item.id}`);
+            if (chk) {
+                chk.checked = !!_labAktif[item.id];
+                _updateLabItemVisual(item.id, !!_labAktif[item.id]);
+            }
+        });
+        _updateLabGroupCount(g.id);
+    });
+}
+
+function _getLabAktifPayload() {
+    return JSON.stringify(_labAktif);
+}
+
+// ────────────────────────────────────────
 //  HTML SEKSI: DOKTER
 // ────────────────────────────────────────
 function _htmlDokterSection() {
@@ -357,6 +535,7 @@ async function memuatSettings() {
         _renderDokterList();
         _renderAiKeys(_settingsCache);
         _initModuleAccess();
+        _loadLabAktif(_settingsCache);
 
         showSettingsBanner("✅ Konfigurasi berhasil dimuat", "success");
         setTimeout(() => hideSettingsBanner(), 2500);
@@ -378,6 +557,7 @@ function _fallbackDariKonstanta() {
     _renderDokterList();
     _renderAiKeys({});
     _initModuleAccess();
+    _loadLabAktif({});
 }
 
 // ────────────────────────────────────────
@@ -395,6 +575,21 @@ function _isiFormDariSettings(s) {
     _setVal('cfg_ss_org_id',        s.ss_org_id         || '');
     _setVal('cfg_ss_client_id',     s.ss_client_id      || '');
     _setVal('cfg_ss_client_secret', '');
+}
+
+// ── Helper muat lab aktif dari settings ──
+function _loadLabAktif(s) {
+    _labAktif = {};
+    if (s.lab_aktif) {
+        try { _labAktif = JSON.parse(s.lab_aktif); } catch(e) {}
+    }
+    // Default: 3 lab dasar aktif jika belum ada konfigurasi
+    if (Object.keys(_labAktif).length === 0) {
+        _labAktif = { lab_gds: true, lab_chol: true, lab_ua: true };
+    }
+    _renderLabToggles();
+    // Simpan ke window global agar page-medis bisa pakai
+    window._labAktif = _labAktif;
 }
 
 // ════════════════════════════════════════
@@ -796,6 +991,20 @@ async function simpanSeksi(seksi) {
             _terapkanSettingsRuntime(aiKeysPayload, window._dokterAktif || []);
             showToast("✅ API Key AI disimpan", "success");
 
+        } else if (seksi === 'lab') {
+            // Kumpulkan state toggle dari DOM
+            LAB_GROUPS.forEach(g => {
+                g.items.forEach(item => {
+                    const chk = $(`labtog_${item.id}`);
+                    if (chk) _labAktif[item.id] = chk.checked;
+                });
+            });
+            await sb_saveSettings({ lab_aktif: _getLabAktifPayload() });
+            window._labAktif = _labAktif;
+            // Rebuild section lab di halaman medis jika sudah terbuka
+            if (typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
+            showToast("✅ Konfigurasi laboratorium disimpan", "success");
+
         } else if (seksi === 'integrasi') {
             const payload = {
                 ocr_api_key:      _getVal('cfg_ocr_api_key'),
@@ -843,6 +1052,14 @@ async function simpanSemuaSettings() {
 
     const dokterPayload = _kumpulkanDokter();
 
+    // Sinkron lab toggles dari DOM
+    LAB_GROUPS.forEach(g => {
+        g.items.forEach(item => {
+            const chk = $(`labtog_${item.id}`);
+            if (chk) _labAktif[item.id] = chk.checked;
+        });
+    });
+
     const payload = {
         klinik_nama:      _getVal('cfg_klinik_nama'),
         klinik_title:     _getVal('cfg_klinik_title'),
@@ -856,6 +1073,7 @@ async function simpanSemuaSettings() {
         ss_client_id:     _getVal('cfg_ss_client_id'),
         ss_client_secret: _getVal('cfg_ss_client_secret'),
         module_access:    JSON.stringify(_moduleAccess),
+        lab_aktif:        _getLabAktifPayload(),
         dokter:           JSON.stringify(dokterPayload),
         ...aiKeysPayload
     };
@@ -863,6 +1081,7 @@ async function simpanSemuaSettings() {
     try {
         await sb_saveSettings(payload);
         localStorage.setItem('kp_module_access', JSON.stringify(_moduleAccess));
+        window._labAktif = _labAktif;
         _terapkanSettingsRuntime(payload, dokterPayload);
         _setVal('cfg_ss_client_secret', '');
         showSettingsBanner("✅ Semua pengaturan berhasil disimpan!", "success");
@@ -950,6 +1169,15 @@ function _injectAccordionStyle() {
     style.id = 'settings-accordion-style';
     style.textContent = `
     .page-settings-wrap { padding: 12px 0 20px; }
+
+    /* ── Banner animation ── */
+    @keyframes sbBannerIn {
+        from { opacity:0; transform:translateY(-10px) scale(0.92); }
+        to   { opacity:1; transform:translateY(0)     scale(1); }
+    }
+
+    /* ── Lab toggle item hover ── */
+    .lab-toggle-item:hover { background: rgba(var(--primary-rgb,37,99,235),0.04) !important; }
 
     /* ── Accordion Card ── */
     .settings-accordion {
@@ -1256,25 +1484,39 @@ function _injectAccordionStyle() {
 //  HELPERS
 // ════════════════════════════════════════
 function showSettingsBanner(msg, type) {
-    const el = $('settingsBanner');
+    let el = $('settingsBanner');
     if (!el) return;
-    el.style.display = 'block';
-    el.textContent   = msg;
+
     const colors = {
-        success: { bg:'rgba(5,150,105,0.1)',  color:'#065f46', border:'rgba(5,150,105,0.3)'  },
-        error:   { bg:'rgba(239,68,68,0.1)',  color:'#dc2626', border:'rgba(239,68,68,0.3)'  },
-        warning: { bg:'rgba(245,158,11,0.1)', color:'#92400e', border:'rgba(245,158,11,0.3)' },
-        info:    { bg:'rgba(59,130,246,0.1)', color:'#1d4ed8', border:'rgba(59,130,246,0.3)' }
+        success: { bg:'#ecfdf5', color:'#065f46', border:'#6ee7b7', icon:'✅' },
+        error:   { bg:'#fef2f2', color:'#dc2626', border:'#fca5a5', icon:'❌' },
+        warning: { bg:'#fffbeb', color:'#92400e', border:'#fcd34d', icon:'⚠️' },
+        info:    { bg:'#eff6ff', color:'#1d4ed8', border:'#93c5fd', icon:'⏳' }
     };
     const c = colors[type] || colors.info;
-    el.style.background  = c.bg;
-    el.style.color       = c.color;
-    el.style.borderColor = c.border;
+
+    el.innerHTML = `
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;
+        background:${c.bg};color:${c.color};border:1.5px solid ${c.border};
+        border-radius:50px;font-size:12px;font-weight:700;
+        box-shadow:0 4px 20px rgba(0,0,0,0.12);
+        animation:sbBannerIn 0.25s cubic-bezier(.34,1.56,.64,1);">
+        <span>${c.icon}</span>
+        <span>${msg}</span>
+    </div>`;
+    el.style.cssText = `
+        display:flex;justify-content:center;
+        position:fixed;top:70px;left:0;right:0;z-index:9999;
+        pointer-events:none;`;
 }
 
 function hideSettingsBanner() {
     const el = $('settingsBanner');
-    if (el) el.style.display = 'none';
+    if (el) {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.3s';
+        setTimeout(() => { el.style.display = 'none'; el.style.opacity = '1'; }, 300);
+    }
 }
 
 function togglePasswordVis(inputId, btn) {
