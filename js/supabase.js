@@ -256,6 +256,7 @@ async function sb_checkAndUpsertPasien(payload) {
         // Fungsi ginjal
         lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
+        alergi: r.alergi || '',
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
         status: r.status
@@ -329,6 +330,7 @@ async function sb_getKunjunganById(kunjunganId) {
         // Fungsi ginjal
         lab_ureum: r.lab_ureum, lab_creatinin: r.lab_creatinin,
         keluhan: r.keluhan, fisik: r.fisik,
+        alergi: r.alergi || '',
         diag: r.diagnosa, diagnosa2: r.diagnosa2,
         terapi: r.terapi, surat_sakit: r.surat_sakit,
         status: r.status
@@ -348,7 +350,7 @@ async function sb_saveKunjungan(payload) {
         lab_gdp, lab_hba1c,
         lab_sgot, lab_sgpt,
         lab_ureum, lab_creatinin,
-        keluhan, fisik, diagnosa, diagnosa2, terapi, suratSakit
+        keluhan, fisik, alergi, diagnosa, diagnosa2, terapi, suratSakit
     } = payload;
 
     // BUG E FIX: Guard — jangan PATCH pasien jika pasienId tidak valid
@@ -403,6 +405,7 @@ async function sb_saveKunjungan(payload) {
         lab_creatinin:_num(lab_creatinin),
         keluhan: keluhan || null,
         fisik:   fisik   || null,
+        alergi:  alergi  || null,
         diagnosa:  diagnosa  || null,
         diagnosa2: diagnosa2 || null,
         terapi:    terapi    || null,

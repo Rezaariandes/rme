@@ -285,6 +285,7 @@ async function saveAll() {
         lab_creatinin:_num('lab_creatinin'),
         keluhan:  $('keluhan')  ? $('keluhan').value  : '',
         fisik:    $('fisik')    ? $('fisik').value    : '',
+        alergi:   $('alergi')   ? $('alergi').value.trim()  : '',
         // BUG B FIX: diagnosa1 & diagnosa2 dikirim terpisah (bukan digabung dengan |)
         diagnosa:  d1,
         diagnosa2: d2,

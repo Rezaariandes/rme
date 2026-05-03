@@ -200,6 +200,7 @@ function _isiFormDariKunjungan(h) {
     if ($('lab_creatinin')) $('lab_creatinin').value = h.lab_creatinin || '';
     if ($('keluhan')) $('keluhan').value = h.keluhan || '';
     if ($('fisik'))   $('fisik').value   = h.fisik   || '';
+    if ($('alergi'))  $('alergi').value  = h.alergi  || '';
 
     // FIX Bug 2: diagnosa2 kini disimpan sebagai kolom terpisah di Supabase.
     // Prioritaskan h.diagnosa2 langsung; fallback ke format lama "diag1 | diag2"
