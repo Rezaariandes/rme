@@ -1,14 +1,18 @@
 <div class="bottom-nav">
-    <div class="nav-item active-nav" onclick="switchPage('pageDaftar', this)">
+    <div class="nav-item active-nav" id="navDaftar" onclick="switchPage('pageDaftar', this)">
         <div class="nav-icon-wrap">👤</div>
-        <div class="nav-label">PENDAFTARAN</div>
+        <div class="nav-label">DAFTAR</div>
     </div>
-    <div class="nav-item" onclick="switchPage('pageHariIni', this)">
+    <div class="nav-item" id="navHariIni" onclick="switchPage('pageHariIni', this)">
         <div class="nav-icon-wrap">📅</div>
         <div class="nav-label">KUNJUNGAN</div>
     </div>
-    <div class="nav-item" onclick="switchPage('pageUser', this)">
-        <div class="nav-icon-wrap">⚙️</div>
+    <div class="nav-item" id="navLaporan" onclick="switchPage('pageLaporan', this)">
+        <div class="nav-icon-wrap">📊</div>
+        <div class="nav-label">LAPORAN</div>
+    </div>
+    <div class="nav-item" id="navUser" onclick="switchPage('pageUser', this)">
+        <div class="nav-icon-wrap">👥</div>
         <div class="nav-label">USER</div>
     </div>
     <div class="nav-item" onclick="switchPage('pageSettings', this)" id="navSettings">
