@@ -316,7 +316,8 @@ async function saveAll() {
                 setTimeout(() => {
                     currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
                     ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
-                    if ($('jk')) $('jk').value = 'L';
+                    if ($('jk'))        $('jk').value        = 'L';
+                    if ($('suratSakit')) $('suratSakit').checked = false;
                     if (btn) { btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis"; }
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
                     const firstNav = document.querySelector('.nav-item');
