@@ -52,6 +52,7 @@
             pageHariIni:  BASE_URL + '/pages/page-hari-ini.html',
             pageUser:     BASE_URL + '/pages/page-user.html',
             pageSettings: BASE_URL + '/pages/page-settings.html',
+            pageLaporan:  BASE_URL + '/pages/page-laporan.html',
 
             jsUtils:    BASE_URL + '/js/utils.js',
             jsSupabase: BASE_URL + '/js/supabase.js',
@@ -62,6 +63,7 @@
             jsModal:    BASE_URL + '/js/modal.js',
             jsUser:     BASE_URL + '/js/user.js',
             jsSettings: BASE_URL + '/js/settings.js',
+            jsLaporan:  BASE_URL + '/js/laporan.js',
             jsApp:      BASE_URL + '/js/app.js',
             jsAiRek:    BASE_URL + '/js/ai-rekomendasi.js'
         };
@@ -145,6 +147,7 @@
         <div id="slot-page-hari-ini"></div>
         <div id="slot-page-user"></div>
         <div id="slot-page-settings"></div>
+        <div id="slot-page-laporan"></div>
     </div>
 
     <script>
@@ -163,7 +166,7 @@
         try {
             setLoadStep('Mengunduh tampilan...');
             const htmlKeys = ['css','pinLock','modalRiwayat','modalUser','header','nav',
-                              'pageDaftar','pageMedis','pageHariIni','pageUser','pageSettings'];
+                              'pageDaftar','pageMedis','pageHariIni','pageUser','pageSettings','pageLaporan'];
             const htmlResults = await Promise.all(
                 htmlKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
@@ -173,7 +176,7 @@
                 )
             );
             const [css, pinLock, modalRiwayat, modalUser, header, nav,
-                   pageDaftar, pageMedis, pageHariIni, pageUser, pageSettings] = htmlResults;
+                   pageDaftar, pageMedis, pageHariIni, pageUser, pageSettings, pageLaporan] = htmlResults;
 
             setLoadStep('Memuat antarmuka...');
             document.getElementById('dynamic-style').innerHTML = css;
@@ -187,6 +190,7 @@
             document.getElementById('slot-page-hari-ini').innerHTML   = pageHariIni;
             document.getElementById('slot-page-user').innerHTML       = pageUser;
             document.getElementById('slot-page-settings').innerHTML   = pageSettings;
+            document.getElementById('slot-page-laporan').innerHTML    = pageLaporan;
 
             // Nama klinik sementara (akan diupdate setelah loadSettings di app.js)
             const h1   = document.querySelector('.app-title h1');
@@ -195,8 +199,11 @@
             if (span) span.innerText = KLINIK_NAMA;
 
             setLoadStep('Memuat modul aplikasi...');
-            const jsKeys = ['jsUtils','jsSupabase','jsAuth','jsIcd10','jsPasien','jsKunj',
-                            'jsModal','jsUser','jsSettings','jsApp','jsAiRek'];
+            // PENTING: Urutan array ini menentukan urutan eksekusi.
+            // jsSettings HARUS sebelum jsAuth karena auth.js memanggil
+            // applyModuleAccess() yang didefinisikan di settings.js.
+            const jsKeys = ['jsUtils','jsSupabase','jsSettings','jsAuth','jsIcd10',
+                            'jsPasien','jsKunj','jsModal','jsUser','jsLaporan','jsApp','jsAiRek'];
             const jsTexts = await Promise.all(
                 jsKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
@@ -207,6 +214,7 @@
             );
 
             setLoadStep('Menginisialisasi sistem...');
+            // Script diinjeksi secara berurutan agar dependensi antar modul terjaga
             for (const scriptText of jsTexts) {
                 try { injectScript(scriptText); } catch (e) { console.warn('Peringatan:', e); }
             }
