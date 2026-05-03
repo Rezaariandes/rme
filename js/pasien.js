@@ -149,8 +149,6 @@ async function lanjutPemeriksaan() {
         } else {
             // Belum ada kunjungan hari ini — ID null, akan dibuat baru saat saveAll()
             currentKunjunganId = null;
-            // BUG FIX: Pastikan surat sakit tidak tercentang untuk kunjungan baru
-            if ($('suratSakit')) $('suratSakit').checked = false;
             showToast("✅ Siap periksa: " + namaPasien, "success");
         }
 
@@ -219,7 +217,7 @@ function _isiFormDariKunjungan(h) {
         if ($('diagnosa2')) $('diagnosa2').value = diagParts[1] || '';
     }
     if ($('terapi'))      $('terapi').value      = h.terapi      || '';
-    if ($('suratSakit'))  $('suratSakit').checked = !!h.surat_sakit;
+    if ($('suratSakit'))  $('suratSakit').checked = (h.surat_sakit === 'YA' || h.surat_sakit === true || h.surat_sakit === 1);
 }
 
 // ── RESET SESI PENDAFTARAN ──
