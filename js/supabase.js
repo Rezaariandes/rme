@@ -104,13 +104,33 @@ async function sb_saveUser(payload) {
         if (nama)    body.nama     = nama;
         if (jabatan) body.jabatan  = jabatan;
         await _sbFetch(`users?id=eq.${userId}`, { method: 'PATCH', body, prefer: 'return=minimal' });
+        return { status: 'success', userId };
     } else {
-        await _sbFetch('users', {
+        // Gunakan return=representation agar mendapat ID user yang baru dibuat
+        const rows = await _sbFetch('users', {
             method: 'POST',
             body: { nama, jabatan, pin_hash: pinHash },
-            prefer: 'return=minimal'
+            prefer: 'return=representation'
         });
+        const newId = rows && rows[0] ? rows[0].id : null;
+        return { status: 'success', userId: newId };
     }
+}
+
+// ── TAMBAH DOKTER DARI REGISTRASI USER BARU ──
+// Dipanggil oleh user.js saat user baru dengan jabatan Dokter berhasil dibuat.
+// Fungsi ini menambahkan entri ke tabel dokter dengan user_id terhubung
+// sehingga dokter tidak perlu di-input ulang di halaman Settings.
+async function sb_tambahDokterDariUser({ nama, jabatan, nik, ihs, sip, spesialis, user_id }) {
+    // Cek apakah sudah ada dokter dengan user_id yang sama (hindari duplikasi)
+    const existing = await _sbFetch(`dokter?user_id=eq.${user_id}&select=id`);
+    if (existing && existing.length > 0) return { status: 'already_exists' };
+
+    await _sbFetch('dokter', {
+        method: 'POST',
+        body: { nama, jabatan: jabatan || 'Dokter', nik: nik || '', ihs: ihs || '', sip: sip || '', spesialis: spesialis || '', user_id },
+        prefer: 'return=minimal'
+    });
     return { status: 'success' };
 }
 

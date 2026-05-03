@@ -798,14 +798,35 @@ function _renderDokterList() {
 
     if (_dokterList.length === 0) {
         container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:12px;">
-            Belum ada data dokter. Klik ➕ untuk menambahkan.
+            Belum ada data dokter. Klik ➕ untuk menambahkan, atau daftarkan akun user baru dengan jabatan <strong>Dokter</strong> di menu 👥 User.
         </div>`;
         return;
     }
 
-    container.innerHTML = _dokterList.map((d, i) => `
+    container.innerHTML = _dokterList.map((d, i) => {
+        // Cari info akun user yang terhubung (jika ada)
+        const linkedUser = d.user_id
+            ? _userListCache.find(u => String(u.id) === String(d.user_id))
+            : null;
+        const linkedUserInfo = linkedUser
+            ? `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(5,150,105,0.07);border:1px solid rgba(5,150,105,0.2);border-radius:8px;margin-bottom:8px;">
+                   <span style="font-size:14px;">🔗</span>
+                   <div>
+                     <div style="font-size:11px;font-weight:700;color:#065f46;">Terhubung ke akun: ${escHtml(linkedUser.nama)} (${escHtml(linkedUser.jabatan)})</div>
+                     <div style="font-size:10px;color:#059669;">Kunjungan pasien yang diperiksa akan tercatat atas nama dokter ini</div>
+                   </div>
+               </div>`
+            : `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:8px;margin-bottom:8px;">
+                   <span style="font-size:14px;">⚠️</span>
+                   <div style="font-size:11px;color:#92400e;">Belum terhubung ke akun user. Daftarkan user baru dengan jabatan <strong>Dokter</strong> di menu 👥 User agar terhubung otomatis.</div>
+               </div>`;
+
+        // Hidden input untuk user_id agar _kumpulkanDokter() tetap bisa membacanya
+        return `
     <div class="dokter-row" id="dokter_row_${i}">
       <button class="btn-hapus-dokter" onclick="konfirmasiHapusDokter(${i}, '${escHtml(d.nama || 'dokter ini')}')">✕ Hapus</button>
+      <input type="hidden" id="dk_user_id_${i}" value="${escHtml(d.user_id || '')}">
+      ${linkedUserInfo}
       <div class="row g-2 mb-2">
         <div class="col-8">
           <label class="cfg-label">Nama Lengkap + Gelar</label>
@@ -820,18 +841,6 @@ function _renderDokterList() {
             <option value="Apoteker" ${d.jabatan==='Apoteker' ?'selected':''}>Apoteker</option>
             <option value="Admin"    ${d.jabatan==='Admin'    ?'selected':''}>Admin</option>
           </select>
-        </div>
-      </div>
-      <div class="row g-2 mb-2">
-        <div class="col-12">
-          <label class="cfg-label">🔗 Akun User (Login) yang Terhubung</label>
-          <select class="form-control" id="dk_user_id_${i}">
-            <option value="">— Tidak terhubung ke akun —</option>
-            ${_buildUserOptions(d.user_id || '')}
-          </select>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">
-            💡 Hubungkan ke akun user agar kunjungan yang diperiksa tercatat atas nama dokter ini (untuk integrasi Satu Sehat).
-          </div>
         </div>
       </div>
       <div class="row g-2">
@@ -852,7 +861,8 @@ function _renderDokterList() {
           <input type="text" class="form-control" id="dk_spesialis_${i}" value="${escHtml(d.spesialis||'')}" placeholder="Umum / Sp.PD / dll">
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+    }).join('');
 }
 
 function tambahBarisDokter() {

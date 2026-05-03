@@ -17,6 +17,17 @@ function renderJabatanSelect() {
     sel.innerHTML = jabList.map(j =>
         `<option value="${j}" ${j === current ? 'selected' : ''}>${j}</option>`
     ).join('');
+    // Tampilkan/sembunyikan form Satu Sehat sesuai jabatan saat ini
+    _toggleFormDokterBaru();
+}
+
+// ── TOGGLE TAMPILAN FORM DATA SATU SEHAT (saat jabatan = Dokter) ──
+function _toggleFormDokterBaru() {
+    const sel   = $('u_jabatan');
+    const panel = $('panelDataDokterBaru');
+    if (!sel || !panel) return;
+    const isDokter = sel.value.toLowerCase() === 'dokter';
+    panel.style.display = isDokter ? 'block' : 'none';
 }
 
 // ── AMBIL DAFTAR USER DARI SUPABASE ──
@@ -76,21 +87,61 @@ async function simpanUserBaru() {
     if (!nama || !jabatan || !pin) return showToast("⚠️ Semua kolom wajib diisi!", "warning");
     if (pin.length < 4) return showToast("⚠️ PIN minimal 4 digit", "warning");
 
+    const isDokter = jabatan.toLowerCase() === 'dokter';
+
+    // Validasi data Satu Sehat jika jabatan Dokter
+    if (isDokter) {
+        const nik = $('u_nik') ? $('u_nik').value.trim() : '';
+        if (!nik) return showToast("⚠️ NIK wajib diisi untuk akun Dokter!", "warning");
+    }
+
     const btn = $('btnSimpanUser');
     if (btn) { btn.disabled = true; btn.innerText = "Menyimpan..."; }
 
     try {
-        await sb_saveUser({ nama, jabatan, pin });
-        const isDokter = jabatan.toLowerCase() === 'dokter';
+        // 1. Simpan user ke tabel users, dapatkan ID user yang baru dibuat
+        const newUser = await sb_saveUser({ nama, jabatan, pin });
+
+        // 2. Jika jabatan Dokter → otomatis daftarkan ke tabel dokter
+        if (isDokter && newUser && newUser.userId) {
+            const nik      = $('u_nik')      ? $('u_nik').value.trim()      : '';
+            const ihs      = $('u_ihs')      ? $('u_ihs').value.trim()      : '';
+            const sip      = $('u_sip')      ? $('u_sip').value.trim()      : '';
+            const spesialis = $('u_spesialis') ? $('u_spesialis').value.trim() : '';
+
+            await sb_tambahDokterDariUser({
+                nama, jabatan: 'Dokter',
+                nik, ihs, sip, spesialis,
+                user_id: newUser.userId
+            });
+
+            // Refresh cache dokter di settings jika sudah dimuat
+            if (typeof _dokterList !== 'undefined') {
+                try {
+                    const data = await sb_getSettings();
+                    if (data.dokter) {
+                        window._dokterAktif = data.dokter;
+                    }
+                } catch(e) {}
+            }
+        }
+
         showToast(
             isDokter
-                ? `✅ Akun Dokter "${nama}" berhasil dibuat — akan tercatat sebagai dokter pemeriksa`
+                ? `✅ Akun Dokter "${nama}" berhasil dibuat & terdaftar di Data Dokter`
                 : `✅ User baru "${nama}" (${jabatan}) berhasil disimpan`,
             "success"
         );
-        if ($('u_nama'))    $('u_nama').value    = '';
-        if ($('u_jabatan')) renderJabatanSelect(); // reset ke posisi pertama
-        if ($('u_pin'))     $('u_pin').value     = '';
+
+        // Reset form
+        if ($('u_nama'))      $('u_nama').value      = '';
+        if ($('u_pin'))       $('u_pin').value        = '';
+        if ($('u_nik'))       $('u_nik').value        = '';
+        if ($('u_ihs'))       $('u_ihs').value        = '';
+        if ($('u_sip'))       $('u_sip').value        = '';
+        if ($('u_spesialis')) $('u_spesialis').value  = '';
+        renderJabatanSelect(); // reset dropdown ke posisi pertama & sembunyikan panel dokter
+
         fetchUsers();
         if (typeof loadLoginUsers === "function") loadLoginUsers();
     } catch (e) {
