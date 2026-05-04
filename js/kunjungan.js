@@ -273,6 +273,11 @@ function renderKunjunganHariIni() {
 
 /** Buka invoice langsung dari card kunjungan */
 function _quickInvoice(kId, namaPasien) {
+    // BUG-4 FIX: Cek modul biaya aktif, beri pesan jelas jika tidak
+    if (!window._biayaAktif) {
+        showToast('ℹ️ Modul pembiayaan belum diaktifkan di ⚙️ Settings', 'info');
+        return;
+    }
     const tgl = $('filterDate') ? $('filterDate').value : '';
     if (typeof lihatTagihanKunjungan === 'function') {
         lihatTagihanKunjungan(kId, namaPasien, tgl);
@@ -488,8 +493,8 @@ function renderRiwayatList(list, containerId) {
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
-                            ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
-                            ${r.id ? `<button onclick="event.stopPropagation();_bukaResepRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-nama="${escHtml(r.namaPasien||'')}" style="padding:2px 7px;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">💊 Resep</button>` : ''}
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" data-nama="${escHtml(_getNamaPasienUntukRiwayat())}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaResepRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-nama="${escHtml(_getNamaPasienUntukRiwayat())}" style="padding:2px 7px;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">💊 Resep</button>` : ''}
                         </div>
                     </div>
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
@@ -620,15 +625,38 @@ function _renderSectionLabDinamic() {
     checkLabAlert();
 }
 
+// ── Helper: ambil nama pasien untuk tombol Invoice/Resep di riwayat list ──
+// BUG-4 FIX: Sebelumnya r.namaPasien selalu kosong karena field tidak ada di objek riwayat
+function _getNamaPasienUntukRiwayat() {
+    if (typeof allPatients !== 'undefined' && currentPasienId) {
+        const p = allPatients.find(x => x.id === currentPasienId);
+        if (p && p.nama) return p.nama;
+    }
+    // Fallback ke info banner di halaman medis
+    const bannerEl = document.getElementById('infoPasienNama');
+    return (bannerEl && bannerEl.innerText !== '—') ? bannerEl.innerText : '';
+}
+
 // ── Helper: buka invoice dari tombol di riwayat list ──
 function _bukaInvoiceRiwayat(btn) {
     const kunjId = btn.getAttribute('data-kunjid');
     const tgl    = btn.getAttribute('data-tgl');
-    const nama   = (typeof allPatients !== 'undefined' && currentPasienId)
-        ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
-        : '';
+    // BUG-4 FIX: Cari nama dari data-nama jika ada, fallback ke allPatients via currentPasienId
+    let nama = btn.getAttribute('data-nama') || '';
+    if (!nama && typeof allPatients !== 'undefined' && currentPasienId) {
+        nama = (allPatients.find(p => p.id === currentPasienId)?.nama || '');
+    }
+    if (!nama) {
+        // Coba cari dari kunjunganHariIni
+        const k = (typeof kunjunganHariIni !== 'undefined')
+            ? kunjunganHariIni.find(x => x.id === kunjId)
+            : null;
+        if (k) nama = k.nama || '';
+    }
     if (typeof lihatTagihanKunjungan === 'function') {
         lihatTagihanKunjungan(kunjId, nama, tgl);
+    } else {
+        showToast('⚠️ Modul biaya belum dimuat', 'warning');
     }
 }
 
@@ -787,8 +815,8 @@ async function saveAll() {
 
         showToast('✅ Rekam medis berhasil disimpan!', 'success');
 
-        // Buka modal tagihan otomatis jika modul biaya aktif
-        if (window._biayaAktif && currentKunjunganId && typeof openModalTagihan === 'function') {
+        // Buka modal tagihan otomatis jika modul biaya aktif DAN diagnosa sudah diisi (BUG-3 FIX)
+        if (window._biayaAktif && currentKunjunganId && diag1 && typeof openModalTagihan === 'function') {
             try {
                 const namaPasienDisplay = $('infoPasienNama') ? $('infoPasienNama').innerText : namaPasien;
                 await openModalTagihan(currentKunjunganId, currentPasienId, namaPasienDisplay, localDate, payload);

@@ -73,14 +73,18 @@ async function simpanDataPasienOnly() {
 }
 
 // ── LANJUT KE PEMERIKSAAN MEDIS ──
+let _lanjutPemeriksaanBusy = false; // BUG-1 FIX: guard double-click race condition
+
 async function lanjutPemeriksaan() {
     if (!canAccessMedis()) return;
+    if (_lanjutPemeriksaanBusy) return; // Cegah klik ganda
 
     const namaPasien = $('nama') ? $('nama').value.trim() : '';
     if (!namaPasien) return showToast("⚠️ Nama wajib diisi!", "error");
 
     const btn = $('btnNext');
     if (btn) { btn.disabled = true; btn.innerHTML = 'Memproses...'; }
+    _lanjutPemeriksaanBusy = true;
 
     const today        = new Date();
     const tzOffset     = today.getTimezoneOffset() * 60000;
@@ -113,6 +117,7 @@ async function lanjutPemeriksaan() {
 
     switchPage('pageMedis', null);
     if (btn) { btn.disabled = false; btn.innerHTML = 'Lanjut Periksa ›'; }
+    _lanjutPemeriksaanBusy = false;
 
     try {
         const payload = {

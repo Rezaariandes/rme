@@ -150,11 +150,19 @@ async function sb_autoTagihanFromKunjungan(kunjunganId, kunjunganData) {
         if (t) addItem('Pemeriksaan Vital Sign', 'Pemeriksaan', t.harga);
     }
 
-    // 2. Tarif pemeriksaan medis (konsultasi dokter)
-    const hasDiag = kunjunganData.diag;
+    // 2. Tarif konsultasi medis — BUG-2 FIX: cek key 'diagnosa' DAN 'diag'
+    // saveAll() mengirim key 'diagnosa'; data riwayat memakai key 'diag'
+    const hasDiag = kunjunganData.diagnosa || kunjunganData.diag;
     if (hasDiag) {
         const t = tarif.find(x => x.kategori === 'Pemeriksaan' && x.nama === 'Konsultasi Medis');
         if (t) addItem('Konsultasi Medis', 'Pemeriksaan', t.harga);
+    }
+
+    // 3. Tarif pemeriksaan fisik — BUG-2 FIX: sebelumnya tidak pernah dicek
+    const hasFisik = kunjunganData.fisik && String(kunjunganData.fisik).trim() !== '';
+    if (hasFisik) {
+        const t = tarif.find(x => x.kategori === 'Pemeriksaan' && x.nama === 'Pemeriksaan Fisik');
+        if (t) addItem('Pemeriksaan Fisik', 'Pemeriksaan', t.harga);
     }
 
     // 3. Tarif lab per item

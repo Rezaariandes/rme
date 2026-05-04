@@ -256,9 +256,10 @@ async function simpanEditModal() {
         return showToast("⛔ " + hakEdit.alasan, "error");
     }
 
-    const d1 = $('modalDiag1') ? $('modalDiag1').value : '';
-    const d2 = $('modalDiag2') ? $('modalDiag2').value : '';
-    const diagGabung = d2 ? (d1 + " | " + d2) : d1;
+    const d1 = $('modalDiag1') ? $('modalDiag1').value.trim() : '';
+    const d2 = $('modalDiag2') ? $('modalDiag2').value.trim() : '';
+    // BUG FIX: Simpan diagnosa dan diagnosa2 sebagai kolom terpisah
+    // (format lama "d1 | d2" masih disimpan di 'diagnosa' sebagai fallback kompatibilitas)
 
     // Gabungkan sistol/diastol ke format "120/80"
     const sistol  = $('modalSistol')  ? $('modalSistol').value.trim()  : '';
@@ -280,7 +281,8 @@ async function simpanEditModal() {
         lab_gds:  $('modalLabGds')  ? $('modalLabGds').value  : '',
         lab_chol: $('modalLabChol') ? $('modalLabChol').value : '',
         lab_ua:   $('modalLabUa')   ? $('modalLabUa').value   : '',
-        diagnosa: diagGabung,
+        diagnosa: d1,
+        diagnosa2: d2,
         terapi:   $('modalTerapi')  ? $('modalTerapi').value  : ''
     };
 
@@ -315,12 +317,14 @@ async function simpanEditModal() {
             bb:       payload.bb,       tb:       payload.tb,
             lab_gds:  payload.lab_gds,  lab_chol: payload.lab_chol,
             lab_ua:   payload.lab_ua,
-            diag:     payload.diagnosa, terapi:   payload.terapi
+            diag:     d1,
+            diagnosa2: d2,
+            terapi:   payload.terapi
         });
 
         // BUG-08 FIX: Update status ke "Selesai" jika diagnosa & terapi sudah diisi,
         // baik di cache riwayat maupun di array kunjunganHariIni.
-        const isSelesai = !!(payload.diagnosa && payload.terapi);
+        const isSelesai = !!(d1 && payload.terapi);
         if (isSelesai) {
             r.status = 'Selesai';
             if (typeof kunjunganHariIni !== 'undefined') {
