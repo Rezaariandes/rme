@@ -553,7 +553,29 @@ async function lihatTagihanKunjungan(kunjunganId, pasienNama, tgl) {
     try {
         const tagihan = await sb_getTagihan(kunjunganId);
         if (!tagihan) {
-            showToast('ℹ️ Belum ada tagihan untuk kunjungan ini', 'info');
+            // BUG-4 FIX: Jika belum ada tagihan, tawarkan untuk membuat dari riwayat
+            if (confirm(`ℹ️ Belum ada tagihan untuk kunjungan ini.\n\nBuat tagihan sekarang?`)) {
+                // Ambil data kunjungan untuk auto-generate
+                try {
+                    const kunjData = await sb_getKunjunganById(kunjunganId);
+                    if (kunjData) {
+                        _tagihanKunjId    = kunjunganId;
+                        _tagihanPasienId  = kunjData.pasien_id || null;
+                        _tagihanPasienNama = pasienNama || '—';
+                        _tagihanTgl       = tgl || '';
+                        if (_tarifCache.length === 0) await _refreshTarifCache();
+                        try {
+                            _tagihanItems = await sb_autoTagihanFromKunjungan(kunjunganId, kunjData);
+                        } catch(e) { _tagihanItems = []; }
+                        let modal = document.getElementById('modalTagihan');
+                        if (!modal) { modal = _buildModalTagihan(); document.body.appendChild(modal); }
+                        _renderModalTagihanContent();
+                        modal.style.display = 'block';
+                    }
+                } catch(e) {
+                    showToast('❌ Gagal memuat data kunjungan', 'error');
+                }
+            }
             return;
         }
         _showInvoiceModal(tagihan, pasienNama || '—', tgl || '');
