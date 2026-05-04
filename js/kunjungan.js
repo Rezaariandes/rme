@@ -650,3 +650,190 @@ async function _bukaResepRiwayat(btn) {
         showToast("❌ Gagal memuat resep", "error");
     }
 }
+
+// ════════════════════════════════════════════════════════
+//  SIMPAN REKAM MEDIS — saveAll()
+//  Dipanggil dari tombol "✓ Simpan Rekam Medis" di page-medis.html
+//  Mengumpulkan semua nilai form dan mengirim ke sb_saveKunjungan()
+// ════════════════════════════════════════════════════════
+async function saveAll() {
+    const btn = $('btnSave');
+    if (btn) { btn.disabled = true; btn.innerText = '⏳ Menyimpan...'; }
+
+    try {
+        // ── Validasi minimal ──
+        if (!currentPasienId || currentPasienId === 'null') {
+            showToast('⚠️ Data pasien tidak ditemukan. Daftar ulang dari halaman Daftar.', 'warning');
+            return;
+        }
+
+        // ── Validasi nilai vital ──
+        const vitalErrors = (typeof validasiNilaiVital === 'function') ? validasiNilaiVital() : [];
+        if (vitalErrors && vitalErrors.length > 0) {
+            showToast('⚠️ ' + vitalErrors[0], 'warning');
+            return;
+        }
+
+        // ── Tanggal & waktu ──
+        const today      = new Date();
+        const tzOffset   = today.getTimezoneOffset() * 60000;
+        const localDate  = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
+        const localTime  = String(today.getHours()).padStart(2,'0') + ':' + String(today.getMinutes()).padStart(2,'0');
+
+        // ── Gabungkan sistol/diastol ──
+        const sistol  = $('sistol')  ? $('sistol').value.trim()  : '';
+        const diastol = $('diastol') ? $('diastol').value.trim() : '';
+        const td      = (sistol && diastol) ? `${sistol}/${diastol}` : (sistol || diastol || '');
+
+        // ── Diagnosa 1 + 2 ──
+        const diag1 = $('diagnosa')  ? $('diagnosa').value.trim()  : '';
+        const diag2 = $('diagnosa2') ? $('diagnosa2').value.trim() : '';
+
+        // ── Surat sakit ──
+        const suratSakit = ($('suratSakit') && $('suratSakit').checked) ? 'YA' : null;
+
+        // ── User ID (dokter yang login) ──
+        const userId = (typeof loggedInUser !== 'undefined' && loggedInUser) ? loggedInUser.id : null;
+
+        // ── Ambil data pasien dari form (untuk update profil) ──
+        const namaPasien = $('nama')      ? $('nama').value.trim()      : '';
+        const nik        = $('nik')       ? $('nik').value.trim()       : '';
+        const jk         = $('jk')        ? $('jk').value               : 'L';
+        const tgl_lahir  = $('tgl_lahir') ? $('tgl_lahir').value.trim() : '';
+        const alamat     = $('alamat')    ? $('alamat').value.trim()    : '';
+        const alergi     = $('alergi')    ? $('alergi').value.trim()    : '';
+
+        const payload = {
+            pasienId:    currentPasienId,
+            kunjunganId: currentKunjunganId,
+            localDate, localTime,
+            userId,
+            nama: namaPasien, nik, tgl_lahir, jk, alamat, alergi,
+            td,
+            nadi:  $('nadi') ? $('nadi').value : '',
+            suhu:  $('suhu') ? $('suhu').value : '',
+            rr:    $('rr')   ? $('rr').value   : '',
+            bb:    $('bb')   ? $('bb').value   : '',
+            tb:    $('tb')   ? $('tb').value   : '',
+            // Lab dasar
+            lab_gds:  $('lab_gds')  ? $('lab_gds').value  : '',
+            lab_chol: $('lab_chol') ? $('lab_chol').value : '',
+            lab_ua:   $('lab_ua')   ? $('lab_ua').value   : '',
+            // Darah rutin
+            lab_hb:         $('lab_hb')         ? $('lab_hb').value         : '',
+            lab_trombosit:  $('lab_trombosit')  ? $('lab_trombosit').value  : '',
+            lab_leukosit:   $('lab_leukosit')   ? $('lab_leukosit').value   : '',
+            lab_eritrosit:  $('lab_eritrosit')  ? $('lab_eritrosit').value  : '',
+            lab_hematokrit: $('lab_hematokrit') ? $('lab_hematokrit').value : '',
+            // Triple eliminasi
+            lab_hiv:      $('lab_hiv')      ? $('lab_hiv').value      : '',
+            lab_sifilis:  $('lab_sifilis')  ? $('lab_sifilis').value  : '',
+            lab_hepatitis:$('lab_hepatitis')? $('lab_hepatitis').value : '',
+            // Profil lemak
+            lab_hdl: $('lab_hdl') ? $('lab_hdl').value : '',
+            lab_ldl: $('lab_ldl') ? $('lab_ldl').value : '',
+            lab_tg:  $('lab_tg')  ? $('lab_tg').value  : '',
+            // Gula darah
+            lab_gdp:   $('lab_gdp')   ? $('lab_gdp').value   : '',
+            lab_hba1c: $('lab_hba1c') ? $('lab_hba1c').value : '',
+            // Fungsi hati
+            lab_sgot: $('lab_sgot') ? $('lab_sgot').value : '',
+            lab_sgpt: $('lab_sgpt') ? $('lab_sgpt').value : '',
+            // Fungsi ginjal
+            lab_ureum:    $('lab_ureum')    ? $('lab_ureum').value    : '',
+            lab_creatinin:$('lab_creatinin')? $('lab_creatinin').value : '',
+            // Klinis
+            keluhan:  $('keluhan') ? $('keluhan').value  : '',
+            fisik:    $('fisik')   ? $('fisik').value    : '',
+            diagnosa: diag1,
+            diagnosa2: diag2,
+            terapi:   $('terapi')  ? $('terapi').value   : '',
+            suratSakit
+        };
+
+        const result = await sb_saveKunjungan(payload);
+
+        // Update currentKunjunganId jika ini kunjungan baru
+        if (result && result.kunjunganId) {
+            currentKunjunganId = result.kunjunganId;
+            localStorage.setItem('cK_id', currentKunjunganId);
+        }
+
+        // Simpan resep obat jika modul stok aktif
+        if (window._stokAktif && currentKunjunganId && typeof _getResepItems === 'function') {
+            try {
+                const resepItems = _getResepItems();
+                if (resepItems && resepItems.length > 0) {
+                    await sb_saveResep(currentKunjunganId, resepItems);
+                }
+            } catch(e) {
+                console.warn('[Klikpro] Resep gagal disimpan:', e.message);
+            }
+        }
+
+        // Update status kunjungan di cache lokal
+        if (typeof kunjunganHariIni !== 'undefined' && currentKunjunganId) {
+            const isSelesai = !!(diag1 && (payload.terapi || payload.td));
+            const kIdx = kunjunganHariIni.findIndex(x => x.id === currentKunjunganId);
+            if (kIdx !== -1) {
+                kunjunganHariIni[kIdx].status = isSelesai ? 'Selesai' : 'Menunggu';
+                kunjunganHariIni[kIdx].td      = td;
+                kunjunganHariIni[kIdx].suhu    = payload.suhu;
+                kunjunganHariIni[kIdx].nadi    = payload.nadi;
+                kunjunganHariIni[kIdx].keluhan = payload.keluhan;
+                kunjunganHariIni[kIdx].diag    = diag1;
+            }
+        }
+
+        showToast('✅ Rekam medis berhasil disimpan!', 'success');
+
+        // Buka modal tagihan otomatis jika modul biaya aktif
+        if (window._biayaAktif && currentKunjunganId && typeof openModalTagihan === 'function') {
+            try {
+                const namaPasienDisplay = $('infoPasienNama') ? $('infoPasienNama').innerText : namaPasien;
+                await openModalTagihan(currentKunjunganId, currentPasienId, namaPasienDisplay, localDate, payload);
+            } catch(e) {
+                console.warn('[Klikpro] Modal tagihan gagal:', e.message);
+            }
+        }
+
+        // Refresh riwayat di halaman medis
+        try {
+            if (currentPasienId) {
+                const riwayatRows = await _sbFetch(
+                    `kunjungan?pasien_id=eq.${currentPasienId}&order=tgl.desc,waktu.desc&select=*`
+                );
+                if (!window._usersCache || window._usersCache.length === 0) {
+                    const users = await _sbFetch('users?select=id,nama,jabatan&order=nama.asc');
+                    window._usersCache = users || [];
+                }
+                currentRiwayat = riwayatRows.map(r => {
+                    const dokterUser = r.user_id
+                        ? (window._usersCache || []).find(u => u.id === r.user_id && u.jabatan?.toLowerCase() === 'dokter')
+                        : null;
+                    return {
+                        id: r.id, tgl: r.tgl, waktu: r.waktu,
+                        td: r.td, nadi: r.nadi, suhu: r.suhu, rr: r.rr, bb: r.bb, tb: r.tb,
+                        keluhan: r.keluhan, fisik: r.fisik,
+                        lab_gds: r.lab_gds, lab_chol: r.lab_chol, lab_ua: r.lab_ua,
+                        diag: r.diagnosa, diagnosa2: r.diagnosa2,
+                        terapi: r.terapi, surat_sakit: r.surat_sakit,
+                        status: r.status, user_id: r.user_id,
+                        status_obat: !!r.status_obat, status_bayar: !!r.status_bayar,
+                        dokterNama: dokterUser ? dokterUser.nama : ''
+                    };
+                });
+                localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
+                if (typeof renderRiwayatList === 'function') renderRiwayatList(currentRiwayat, 'historyListMedis');
+            }
+        } catch(e) {
+            console.warn('[Klikpro] Gagal refresh riwayat:', e.message);
+        }
+
+    } catch (e) {
+        console.error('[Klikpro] saveAll error:', e);
+        showToast('❌ Gagal menyimpan: ' + (e.message || 'Cek koneksi internet'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = '✓ Simpan Rekam Medis'; }
+    }
+}
