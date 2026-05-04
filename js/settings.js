@@ -256,6 +256,29 @@ function toggleSettingsSection(id) {
 function _htmlIdentitasKlinik() {
     return `
     <div class="row g-2">
+      <!-- LOGO KLINIK -->
+      <div class="col-12">
+        <label class="cfg-label">Logo Klinik</label>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div id="logoPreviewWrap" style="width:72px;height:72px;border-radius:14px;border:2px dashed #e2e8f0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;flex-shrink:0;">
+            <img id="logoPreviewImg" src="" alt="" style="width:100%;height:100%;object-fit:contain;display:none;">
+            <span id="logoPreviewPlaceholder" style="font-size:28px;">🏥</span>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <input type="file" id="cfg_klinik_logo_file" accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              style="width:100%;font-size:12px;padding:6px;border:1.5px dashed #e2e8f0;border-radius:8px;cursor:pointer;"
+              onchange="_onLogoFileChange(this)">
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+              PNG / JPG / SVG · Max 200KB · Otomatis jadi favicon<br>
+              <span id="logoFileSizeInfo"></span>
+            </div>
+            <button onclick="_hapusLogo()" style="margin-top:6px;padding:3px 10px;background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2);border-radius:6px;font-size:10.5px;cursor:pointer;">
+              🗑️ Hapus Logo
+            </button>
+          </div>
+        </div>
+        <input type="hidden" id="cfg_klinik_logo">
+      </div>
       <div class="col-12">
         <label class="cfg-label">Nama Klinik / Praktek</label>
         <input type="text" class="form-control" id="cfg_klinik_nama" placeholder="Praktek dr. …">
@@ -562,6 +585,7 @@ async function memuatSettings() {
         _loadLabAktif(_settingsCache);
         _loadStokAktif(_settingsCache);
         _loadBiayaAktif(_settingsCache);
+        _loadLogoKlinik(_settingsCache);
 
         showSettingsBanner("✅ Konfigurasi berhasil dimuat", "success");
         setTimeout(() => hideSettingsBanner(), 2500);
@@ -979,7 +1003,8 @@ async function simpanSeksi(seksi) {
                 klinik_alamat: _getVal('cfg_klinik_alamat'),
                 klinik_telp:   _getVal('cfg_klinik_telp'),
                 klinik_email:  _getVal('cfg_klinik_email'),
-                jabatan_medis: _getVal('cfg_jabatan_medis')
+                jabatan_medis: _getVal('cfg_jabatan_medis'),
+                klinik_logo:   _getVal('cfg_klinik_logo')
             });
             // Jika jabatan berubah, refresh panel akses
             _initModuleAccess();
@@ -1108,6 +1133,7 @@ async function simpanSemuaSettings() {
     });
 
     const payload = {
+        klinik_logo:      _getVal('cfg_klinik_logo'),
         klinik_nama:      _getVal('cfg_klinik_nama'),
         klinik_title:     _getVal('cfg_klinik_title'),
         klinik_alamat:    _getVal('cfg_klinik_alamat'),
@@ -1825,4 +1851,102 @@ function _applyBiayaAktif(aktif) {
     const navBiaya = document.getElementById('navBiaya');
     if (navBiaya) navBiaya.style.display = aktif ? '' : 'none';
     window._biayaAktif = aktif;
+}
+
+
+// ════════════════════════════════════════
+//  LOGO KLINIK — SETTINGS
+// ════════════════════════════════════════
+function _onLogoFileChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const infoEl = document.getElementById('logoFileSizeInfo');
+    const maxKB  = 200;
+    const sizeKB = Math.round(file.size / 1024);
+
+    if (infoEl) infoEl.textContent = `Ukuran: ${sizeKB} KB`;
+
+    if (sizeKB > maxKB) {
+        showToast(`⚠️ File terlalu besar (${sizeKB}KB). Maksimal ${maxKB}KB.`, 'error');
+        input.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const base64 = e.target.result; // data:image/...;base64,...
+        // Set ke hidden field untuk disimpan
+        const hiddenEl = document.getElementById('cfg_klinik_logo');
+        if (hiddenEl) hiddenEl.value = base64;
+        // Preview
+        _applyLogoPreview(base64);
+        showToast('✅ Logo siap — klik Simpan untuk menyimpan', 'success');
+    };
+    reader.readAsDataURL(file);
+}
+
+function _applyLogoPreview(base64) {
+    const img  = document.getElementById('logoPreviewImg');
+    const ph   = document.getElementById('logoPreviewPlaceholder');
+    if (img && base64) {
+        img.src = base64;
+        img.style.display = '';
+        if (ph) ph.style.display = 'none';
+    } else if (img) {
+        img.src = ''; img.style.display = 'none';
+        if (ph) ph.style.display = '';
+    }
+}
+
+function _hapusLogo() {
+    const hiddenEl = document.getElementById('cfg_klinik_logo');
+    const fileEl   = document.getElementById('cfg_klinik_logo_file');
+    const infoEl   = document.getElementById('logoFileSizeInfo');
+    if (hiddenEl) hiddenEl.value = '';
+    if (fileEl)   fileEl.value  = '';
+    if (infoEl)   infoEl.textContent = '';
+    _applyLogoPreview('');
+    showToast('🗑️ Logo dihapus — klik Simpan untuk menyimpan perubahan', 'info');
+}
+
+function _loadLogoKlinik(s) {
+    const base64 = s.klinik_logo || '';
+    const hiddenEl = document.getElementById('cfg_klinik_logo');
+    if (hiddenEl) hiddenEl.value = base64;
+    if (base64) _applyLogoPreview(base64);
+    // Terapkan ke seluruh app (favicon + header logo)
+    if (base64) _applyLogoToApp(base64);
+}
+
+function _applyLogoToApp(base64) {
+    if (!base64) return;
+
+    // 1. Favicon dinamis
+    let favicon = document.querySelector("link[rel~='icon']");
+    if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+    }
+    favicon.href = base64;
+
+    // 2. Apple touch icon
+    let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
+    if (!appleIcon) {
+        appleIcon = document.createElement('link');
+        appleIcon.rel = 'apple-touch-icon';
+        document.head.appendChild(appleIcon);
+    }
+    appleIcon.href = base64;
+
+    // 3. Logo di header app (jika ada element #appLogoImg)
+    const appLogo = document.getElementById('appLogoImg');
+    if (appLogo) {
+        appLogo.src = base64;
+        appLogo.style.display = '';
+    }
+
+    // 4. Simpan ke localStorage agar persisten antar sesi sebelum settings dimuat
+    try { localStorage.setItem('klikpro_logo', base64); } catch(e) {}
 }
