@@ -538,6 +538,12 @@ async function lihatTagihanKunjungan(kunjunganId, pasienNama, tgl) {
 }
 
 function _showInvoiceModal(tagihan, pasienNama, tgl) {
+    // Simpan tagihan ke window var — JANGAN pakai JSON.stringify di onclick attribute
+    // karena data besar / karakter kutip akan merusak HTML attribute dan freeze browser
+    window._invoiceData    = tagihan;
+    window._invoiceNama    = pasienNama || '';
+    window._invoiceTgl     = tgl || '';
+
     let modal = document.getElementById('modalInvoiceView');
     if (!modal) {
         modal = document.createElement('div');
@@ -545,11 +551,12 @@ function _showInvoiceModal(tagihan, pasienNama, tgl) {
         modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);overflow-y:auto;padding:12px;';
         document.body.appendChild(modal);
     }
+
     modal.innerHTML = `
     <div style="background:#fff;border-radius:18px;max-width:520px;margin:0 auto;padding:0;box-shadow:0 8px 40px rgba(0,0,0,0.2);overflow:hidden;">
         ${_buildInvoiceHtml(tagihan, pasienNama, tgl, false)}
         <div style="padding:12px 18px 18px;display:flex;gap:8px;">
-            <button onclick="printInvoice(${JSON.stringify(tagihan).replace(/"/g,'&quot;')}, '${escHtml(pasienNama)}', '${tgl}')"
+            <button onclick="_printInvoiceFromWindow()"
                 style="flex:1;padding:11px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
                 🖨️ Print Invoice
             </button>
@@ -560,6 +567,15 @@ function _showInvoiceModal(tagihan, pasienNama, tgl) {
         </div>
     </div>`;
     modal.style.display = 'block';
+}
+
+/** Ambil data dari window var lalu print — dipanggil dari tombol di _showInvoiceModal */
+function _printInvoiceFromWindow() {
+    const tagihan   = window._invoiceData;
+    const nama      = window._invoiceNama || '';
+    const tgl       = window._invoiceTgl  || '';
+    if (!tagihan) return showToast('⚠️ Data invoice tidak tersedia', 'error');
+    printInvoice(tagihan, nama, tgl);
 }
 
 // ════════════════════════════════════════

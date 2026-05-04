@@ -231,18 +231,6 @@ function toggleEditModal(isEdit) {
 }
 
 function closeModal() {
-    // Invoice button: show if kunjungan has id
-    const invRow = $('viewInvoiceRow');
-    if (invRow) {
-        invRow.style.display = r.id ? '' : 'none';
-        // Store current kunjungan data for invoice lookup
-        window._modalCurrentKunjId  = r.id  || null;
-        window._modalCurrentPasienNama = (typeof allPatients !== 'undefined')
-            ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
-            : '';
-        window._modalCurrentTgl = r.tgl || '';
-    }
-
     const modal = $('modalRiwayat');
     if (modal) modal.classList.remove('show');
 }

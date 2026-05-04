@@ -392,7 +392,7 @@ function renderRiwayatList(riwayatArr, containerId) {
                         <div class="riwayat-date">📅 ${r.tgl ? formatTglIndo(r.tgl) : '-'} <span style="color:var(--text-muted); font-weight:normal;">${r.waktu ? '(' + r.waktu + ')' : ''}</span></div>
                         <div style="display:flex;gap:6px;align-items:center;">
                         <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
-                        ${r.id ? `<button onclick="event.stopPropagation();lihatTagihanKunjungan('${r.id}','${(r.namaPasien||'').replace(/'/g,'')}',' ${r.tgl||''}')" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
+                        ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
                     </div>
                     </div>
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
@@ -521,4 +521,18 @@ function _renderSectionLabDinamic() {
     });
 
     checkLabAlert();
+}
+
+// ── Helper: buka invoice dari tombol di riwayat list ──
+// Pakai data-attribute bukan inline string untuk hindari masalah quote/escape
+function _bukaInvoiceRiwayat(btn) {
+    const kunjId = btn.getAttribute('data-kunjid');
+    const tgl    = btn.getAttribute('data-tgl');
+    // Nama pasien ambil dari state global yang sudah ada
+    const nama   = (typeof allPatients !== 'undefined' && currentPasienId)
+        ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
+        : '';
+    if (typeof lihatTagihanKunjungan === 'function') {
+        lihatTagihanKunjungan(kunjId, nama, tgl);
+    }
 }
