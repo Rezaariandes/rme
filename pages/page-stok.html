@@ -7,9 +7,14 @@
                     <div style="font-size:16px;font-weight:800;color:var(--primary-dark);">💊 Manajemen Stok Obat</div>
                     <div style="font-size:11px;color:var(--text-muted);">Kelola data, harga, dan stok obat klinik</div>
                 </div>
-                <button onclick="openModalObat()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
-                    ➕ Tambah Obat
-                </button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button onclick="openModalImportObat()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(99,102,241,0.1);color:var(--primary);border:1.5px solid rgba(99,102,241,0.3);border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
+                        📥 Import Excel
+                    </button>
+                    <button onclick="openModalObat()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
+                        ➕ Tambah Obat
+                    </button>
+                </div>
             </div>
 
             <!-- Search + Filter -->
@@ -23,7 +28,7 @@
             </div>
 
             <!-- Ringkasan Statistik -->
-            <div id="stokSummary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;"></div>
+            <div id="stokSummary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;"></div>
 
             <!-- Tabel / List Obat -->
             <div id="daftarObat" style="min-height:120px;">
@@ -92,7 +97,12 @@
                         <option value="prn">Prn (bila perlu)</option>
                     </select>
                 </div>
-                <div class="col-12">
+                <div class="col-6">
+                    <label class="form-label">Exp. Date</label>
+                    <input type="month" id="obat_exp_date" class="form-control">
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Bulan & tahun kadaluarsa</div>
+                </div>
+                <div class="col-6">
                     <label class="form-label">Keterangan</label>
                     <input type="text" id="obat_keterangan" class="form-control" placeholder="Sebelum / sesudah makan, dll.">
                 </div>
@@ -139,4 +149,3 @@
         </div>
     </div>
 </div>
-
