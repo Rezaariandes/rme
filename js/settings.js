@@ -160,7 +160,7 @@ function _renderSettingsPage() {
       )}
 
       <!-- ═══ SEKSI 3d: SISTEM BIAYA ═══ -->
-      \${_buildAccordion('sec_biaya', '🏷️ Sistem Pembiayaan',
+      ${_buildAccordion('sec_biaya', '🏷️ Sistem Pembiayaan',
           'Aktifkan tagihan otomatis, invoice, dan manajemen tarif layanan',
           _htmlBiayaSection(),
           'biaya'
