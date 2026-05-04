@@ -212,8 +212,8 @@
             // PENTING: Urutan array ini menentukan urutan eksekusi.
             // jsSettings HARUS sebelum jsAuth karena auth.js memanggil
             // applyModuleAccess() yang didefinisikan di settings.js.
-            const jsKeys = ['jsUtils','jsSupabase','jsSupabaseStok','jsSettings','jsAuth','jsIcd10',
-                            'jsPasien','jsKunj','jsModal','jsUser','jsLaporan','jsStok','jsSupabaseBiaya','jsBiaya','jsApp','jsAiRek'];
+            const jsKeys = ['jsUtils','jsSupabase','jsSupabaseStok','jsSupabaseBiaya','jsSettings','jsAuth','jsIcd10',
+                            'jsPasien','jsKunj','jsModal','jsUser','jsLaporan','jsStok','jsBiaya','jsApp','jsAiRek'];
             const jsTexts = await Promise.all(
                 jsKeys.map(key =>
                     fetch(FRAGMENT_URLS[key]).then(r => {
