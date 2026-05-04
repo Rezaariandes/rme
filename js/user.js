@@ -112,7 +112,6 @@ function renderUserList() {
             ${badge}
         </div>`;
     };
-    };
 
     let html = aktif.map(renderCard).join('');
 

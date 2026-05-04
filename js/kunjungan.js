@@ -48,26 +48,37 @@ function validasiNilaiVital() {
 
 // ════════════════════════════════════════════════════════
 //  STATUS PENANDA: OBAT & PEMBAYARAN
-//  Disimpan di localStorage dengan key: klikpro_status_<kunjunganId>
+//  Disimpan di Supabase (kolom status_obat, status_bayar di tabel kunjungan)
+//  + fallback cache lokal agar responsif
 // ════════════════════════════════════════════════════════
 
+// Cache lokal status agar tidak perlu fetch ulang setiap render
+window._statusCache = window._statusCache || {};
+
 function _getStatusKunjungan(kId) {
-    try {
-        const raw = localStorage.getItem('klikpro_status_' + kId);
-        return raw ? JSON.parse(raw) : { obat: false, bayar: false };
-    } catch(e) {
-        return { obat: false, bayar: false };
+    // Prioritas: cache lokal (dari Supabase atau toggle)
+    if (window._statusCache[kId]) return window._statusCache[kId];
+    // Fallback ke kunjunganHariIni jika data sudah ada
+    const k = (typeof kunjunganHariIni !== 'undefined' ? kunjunganHariIni : []).find(x => x.id === kId);
+    if (k) {
+        const s = { obat: !!k.status_obat, bayar: !!k.status_bayar };
+        window._statusCache[kId] = s;
+        return s;
     }
+    return { obat: false, bayar: false };
 }
 
 function _setStatusKunjungan(kId, field, value) {
     const s = _getStatusKunjungan(kId);
     s[field] = value;
-    localStorage.setItem('klikpro_status_' + kId, JSON.stringify(s));
+    window._statusCache[kId] = s;
+    // Update juga di kunjunganHariIni agar render ulang sinkron
+    const k = (typeof kunjunganHariIni !== 'undefined' ? kunjunganHariIni : []).find(x => x.id === kId);
+    if (k) k[field === 'obat' ? 'status_obat' : 'status_bayar'] = value;
 }
 
-/** Toggle status obat / bayar dari card kunjungan */
-function toggleStatusKunjungan(event, kId, field) {
+/** Toggle status obat / bayar dari card kunjungan — simpan ke Supabase */
+async function toggleStatusKunjungan(event, kId, field) {
     event.stopPropagation();
     const s   = _getStatusKunjungan(kId);
     const val = !s[field];
@@ -77,33 +88,56 @@ function toggleStatusKunjungan(event, kId, field) {
     const badge = document.getElementById(`badge_${field}_${kId}`);
     if (badge) {
         badge.innerHTML     = _badgeHtml(field, val);
-        badge.style.opacity = val ? '1' : '0.45';
+        badge.style.cssText = _badgeStyleAttr(field, val);
     }
 
     const label = field === 'obat' ? 'Obat' : 'Pembayaran';
     showToast(val ? `✅ ${label} sudah ditandai` : `↩️ ${label} dibatalkan`, val ? 'success' : 'info');
+
+    // Simpan ke Supabase agar persist lintas sesi & logout
+    try {
+        const col = field === 'obat' ? 'status_obat' : 'status_bayar';
+        await _sbFetch(`kunjungan?id=eq.${kId}`, {
+            method: 'PATCH',
+            body: { [col]: val },
+            prefer: 'return=minimal'
+        });
+    } catch(e) {
+        console.warn('[Klikpro] Gagal simpan status ke server:', e.message);
+    }
 }
 
 /** Helper: render HTML badge status */
 function _badgeHtml(field, active) {
     if (field === 'obat') {
         return active
-            ? `<span style="font-size:9px;">💊</span> Obat ✓`
-            : `<span style="font-size:9px;">💊</span> Obat`;
+            ? `<span style="font-size:10px;">💊</span> Resep ✓`
+            : `<span style="font-size:10px;">✕</span> Resep`;
     }
     return active
-        ? `<span style="font-size:9px;">💰</span> Bayar ✓`
-        : `<span style="font-size:9px;">💰</span> Bayar`;
+        ? `<span style="font-size:10px;">💰</span> Bayar ✓`
+        : `<span style="font-size:10px;">✕</span> Bayar`;
 }
 
-/** Helper: warna badge */
+/** Helper: inline style string untuk badge */
+function _badgeStyleAttr(field, active) {
+    const base = `cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;transition:all .15s;`;
+    if (active) {
+        return base + (field === 'obat'
+            ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;opacity:1;'
+            : 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;opacity:1;');
+    }
+    return base + 'background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;opacity:0.85;';
+}
+
+/** Helper: warna badge (legacy — tidak dipakai, tapi jaga kompatibilitas) */
 function _badgeStyle(field, active) {
     if (active) {
         return field === 'obat'
             ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;'
             : 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;';
     }
-    return 'background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;';
+    return 'background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;';
 }
 
 // ── AMBIL DATA KUNJUNGAN BERDASARKAN TANGGAL ──
@@ -123,6 +157,14 @@ async function fetchByDate() {
         return;
     }
 
+    // Reset pencarian saat tanggal berubah
+    _searchKunjungan = '';
+    const searchEl = $('searchKunjungan');
+    if (searchEl) searchEl.value = '';
+
+    // Bersihkan cache status agar data fresh dari server
+    window._statusCache = {};
+
     const listEl = $('listHariIni');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data...</div>`;
     try {
@@ -137,6 +179,8 @@ async function fetchByDate() {
 }
 
 // ── RENDER DAFTAR KUNJUNGAN HARI INI ──
+let _searchKunjungan = ''; // state pencarian nama
+
 function renderKunjunganHariIni() {
     const container = $('listHariIni');
     const statTotal = $('statTotal');
@@ -153,6 +197,10 @@ function renderKunjunganHariIni() {
         return String(a.waktu || "00:00").localeCompare(String(b.waktu || "00:00"));
     });
 
+    // Filter pencarian nama
+    const q = (_searchKunjungan || '').toLowerCase().trim();
+    const filtered = q ? sorted.filter(h => (h.nama || '').toLowerCase().includes(q)) : sorted;
+
     // Tentukan jabatan user yang login
     const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
     const isApoteker = jabatan === 'apoteker';
@@ -160,7 +208,17 @@ function renderKunjunganHariIni() {
     const isAtlm     = jabatan === 'atlm';
     const isParamedis = window._isParamedis === true;
 
-    container.innerHTML = sorted.map(h => {
+    // Tentukan siapa yang boleh toggle status (dari settings hak akses atau fallback)
+    // Fallback: Apoteker/Admin/Dokter bisa toggle obat; Kasir/Admin/Dokter bisa toggle bayar
+    const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
+    const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Tidak ada pasien dengan nama "<strong>${q}</strong>".</div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(h => {
         const isDone     = h.status === 'Selesai';
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
 
@@ -180,7 +238,7 @@ function renderKunjunganHariIni() {
             ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:2px;">👨‍⚕️ dr. ${h.dokterNama}</div>`
             : '';
 
-        // Status penanda obat & bayar
+        // Status penanda obat & bayar — dari Supabase (via _statusCache atau kunjunganHariIni)
         const st       = _getStatusKunjungan(h.id);
         const obatDone = st.obat;
         const bayarDone= st.bayar;
@@ -206,27 +264,17 @@ function renderKunjunganHariIni() {
             </button>`;
         }
 
-        // Badge status obat (Apoteker & semua lihat, hanya Apoteker & Admin bisa toggle)
-        const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
-        const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
-
         const badgeObat = `
         <span id="badge_obat_${h.id}"
             onclick="${canToggleObat ? `toggleStatusKunjungan(event,'${h.id}','obat')` : 'event.stopPropagation()'}"
-            style="cursor:${canToggleObat ? 'pointer' : 'default'};
-                   display:inline-flex;align-items:center;gap:3px;
-                   padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;
-                   ${_badgeStyle('obat', obatDone)}opacity:${obatDone ? '1' : '0.55'};">
+            style="${_badgeStyleAttr('obat', obatDone)}${canToggleObat ? '' : 'cursor:default;'}">
             ${_badgeHtml('obat', obatDone)}
         </span>`;
 
         const badgeBayar = `
         <span id="badge_bayar_${h.id}"
             onclick="${canToggleBayar ? `toggleStatusKunjungan(event,'${h.id}','bayar')` : 'event.stopPropagation()'}"
-            style="cursor:${canToggleBayar ? 'pointer' : 'default'};
-                   display:inline-flex;align-items:center;gap:3px;
-                   padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;
-                   ${_badgeStyle('bayar', bayarDone)}opacity:${bayarDone ? '1' : '0.55'};">
+            style="${_badgeStyleAttr('bayar', bayarDone)}${canToggleBayar ? '' : 'cursor:default;'}">
             ${_badgeHtml('bayar', bayarDone)}
         </span>`;
 

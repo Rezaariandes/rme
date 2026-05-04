@@ -606,7 +606,7 @@ function _fallbackDariKonstanta() {
     _setVal('cfg_klinik_nama',  typeof KLINIK_NAMA  !== 'undefined' ? KLINIK_NAMA  : '');
     _setVal('cfg_klinik_title', typeof KLINIK_TITLE !== 'undefined' ? KLINIK_TITLE : '');
     _setVal('cfg_jabatan_medis',
-        typeof JABATAN_MEDIS !== 'undefined' ? JABATAN_MEDIS.join(', ') : 'Dokter, Admin, Paramedis');
+        typeof JABATAN_MEDIS !== 'undefined' ? JABATAN_MEDIS.join(', ') : 'Dokter, Admin, Paramedis, Apoteker, Kasir, ATLM');
     _renderDokterList();
     _renderAiKeys({});
     _initModuleAccess();
@@ -622,7 +622,7 @@ function _isiFormDariSettings(s) {
     _setVal('cfg_klinik_alamat',    s.klinik_alamat     || '');
     _setVal('cfg_klinik_telp',      s.klinik_telp       || '');
     _setVal('cfg_klinik_email',     s.klinik_email      || '');
-    _setVal('cfg_jabatan_medis',    s.jabatan_medis     || 'Dokter, Admin, Paramedis');
+    _setVal('cfg_jabatan_medis',    s.jabatan_medis     || 'Dokter, Admin, Paramedis, Apoteker, Kasir, ATLM');
     _setVal('cfg_ocr_api_key',      s.ocr_api_key       || '');
     _setVal('cfg_ss_env',           s.ss_env            || 'development');
     _setVal('cfg_ss_org_id',        s.ss_org_id         || '');
@@ -652,7 +652,7 @@ function _loadLabAktif(s) {
 function _initModuleAccess() {
     // Ambil jabatan dari form
     const jabStr = _getVal('cfg_jabatan_medis') ||
-                   (typeof JABATAN_MEDIS !== 'undefined' ? JABATAN_MEDIS.join(', ') : 'Dokter, Admin, Paramedis');
+                   (typeof JABATAN_MEDIS !== 'undefined' ? JABATAN_MEDIS.join(', ') : 'Dokter, Admin, Paramedis, Apoteker, Kasir, ATLM');
     _jabatanList = jabStr.split(',').map(j => j.trim()).filter(j => j);
 
     // Coba parse dari cache server

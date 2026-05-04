@@ -172,10 +172,14 @@ async function sb_initData(filterDate) {
         return {
             id: k.id, pasienId: k.pasien_id,
             nama: p.nama || '', waktu: k.waktu, tgl: k.tgl,
-            td: k.td, suhu: k.suhu, keluhan: k.keluhan,
+            td: k.td, suhu: k.suhu, nadi: k.nadi, keluhan: k.keluhan,
+            lab_gds: k.lab_gds, lab_chol: k.lab_chol, lab_ua: k.lab_ua,
             diag: k.diagnosa, status: k.status || 'Menunggu',
             user_id: k.user_id || null,
-            dokterNama
+            dokterNama,
+            // Status obat & bayar — disimpan di Supabase agar persist lintas sesi
+            status_obat:  !!k.status_obat,
+            status_bayar: !!k.status_bayar
         };
     });
 
