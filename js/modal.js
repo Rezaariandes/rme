@@ -206,12 +206,12 @@ function openModal(index) {
 
     toggleEditModal(false);
 
-    // Invoice button: show if kunjungan has id
+    // Invoice button: tampil hanya jika modul biaya aktif & kunjungan punya ID
     const invRow = $('viewInvoiceRow');
     if (invRow) {
-        invRow.style.display = r.id ? '' : 'none';
-        // Store current kunjungan data for invoice lookup
-        window._modalCurrentKunjId  = r.id  || null;
+        const biayaAktif = window._biayaAktif === true;
+        invRow.style.display = (biayaAktif && r.id) ? '' : 'none';
+        window._modalCurrentKunjId     = r.id  || null;
         window._modalCurrentPasienNama = (typeof allPatients !== 'undefined')
             ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
             : '';
