@@ -96,7 +96,10 @@ const DEFAULT_ACCESS = {
                   'mod_pemeriksaan_keluhan','mod_pemeriksaan_fisik','mod_diagnosa','mod_riwayat',
                   'mod_settings','mod_user','mod_laporan'],
     'Paramedis': ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
-                  'mod_riwayat']
+                  'mod_riwayat'],
+    'Apoteker':  ['mod_daftar','mod_kunjungan','mod_riwayat'],
+    'Kasir':     ['mod_daftar','mod_kunjungan','mod_laporan'],
+    'ATLM':      ['mod_daftar','mod_kunjungan','mod_pemeriksaan_lab','mod_riwayat']
 };
 
 // ── State akses modul yang sedang diedit ──
@@ -806,13 +809,23 @@ function applyModuleAccess(jabatan) {
 
     // ── Simpan window global untuk dipakai modul lain ──
     window._currentAccess = access;
-    window._isParamedis   = jabatan.toLowerCase() === 'paramedis';
+    const jabLower = jabatan.toLowerCase();
+    window._isParamedis   = jabLower === 'paramedis';
+    window._isApoteker    = jabLower === 'apoteker';
+    window._isKasir       = jabLower === 'kasir';
+    window._isAtlm        = jabLower === 'atlm';
 
     // ── Settings page: hanya Admin & Dokter ──
-    const jabLower = jabatan.toLowerCase();
-    if (jabLower === 'paramedis' || !access.includes('mod_settings')) {
+    if (['paramedis','apoteker','kasir','atlm'].includes(jabLower) || !access.includes('mod_settings')) {
         const navSettings = $('navSettings');
         if (navSettings) navSettings.style.display = 'none';
+    }
+
+    // ── Tombol lanjut periksa (pageDaftar → pageMedis) ──
+    // Kasir dan ATLM tidak perlu akses form pemeriksaan lengkap
+    const btnNext = $('btnNext');
+    if (btnNext) {
+        btnNext.style.display = (['kasir','atlm'].includes(jabLower)) ? 'none' : '';
     }
 }
 

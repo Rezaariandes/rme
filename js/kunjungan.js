@@ -46,22 +46,77 @@ function validasiNilaiVital() {
     return errors;
 }
 
+// ════════════════════════════════════════════════════════
+//  STATUS PENANDA: OBAT & PEMBAYARAN
+//  Disimpan di localStorage dengan key: klikpro_status_<kunjunganId>
+// ════════════════════════════════════════════════════════
+
+function _getStatusKunjungan(kId) {
+    try {
+        const raw = localStorage.getItem('klikpro_status_' + kId);
+        return raw ? JSON.parse(raw) : { obat: false, bayar: false };
+    } catch(e) {
+        return { obat: false, bayar: false };
+    }
+}
+
+function _setStatusKunjungan(kId, field, value) {
+    const s = _getStatusKunjungan(kId);
+    s[field] = value;
+    localStorage.setItem('klikpro_status_' + kId, JSON.stringify(s));
+}
+
+/** Toggle status obat / bayar dari card kunjungan */
+function toggleStatusKunjungan(event, kId, field) {
+    event.stopPropagation();
+    const s   = _getStatusKunjungan(kId);
+    const val = !s[field];
+    _setStatusKunjungan(kId, field, val);
+
+    // Update tampilan badge langsung tanpa re-render penuh
+    const badge = document.getElementById(`badge_${field}_${kId}`);
+    if (badge) {
+        badge.innerHTML     = _badgeHtml(field, val);
+        badge.style.opacity = val ? '1' : '0.45';
+    }
+
+    const label = field === 'obat' ? 'Obat' : 'Pembayaran';
+    showToast(val ? `✅ ${label} sudah ditandai` : `↩️ ${label} dibatalkan`, val ? 'success' : 'info');
+}
+
+/** Helper: render HTML badge status */
+function _badgeHtml(field, active) {
+    if (field === 'obat') {
+        return active
+            ? `<span style="font-size:9px;">💊</span> Obat ✓`
+            : `<span style="font-size:9px;">💊</span> Obat`;
+    }
+    return active
+        ? `<span style="font-size:9px;">💰</span> Bayar ✓`
+        : `<span style="font-size:9px;">💰</span> Bayar`;
+}
+
+/** Helper: warna badge */
+function _badgeStyle(field, active) {
+    if (active) {
+        return field === 'obat'
+            ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;'
+            : 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;';
+    }
+    return 'background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;';
+}
+
 // ── AMBIL DATA KUNJUNGAN BERDASARKAN TANGGAL ──
-// BUG-12 FIX: Validasi tanggal — tidak boleh memilih tanggal masa depan.
-// Juga set atribut max pada input agar date picker mobile ikut terbatas.
 async function fetchByDate() {
     const filterEl = $('filterDate');
     if (!filterEl || !filterEl.value) return;
 
-    // Hitung tanggal hari ini (lokal)
     const today     = new Date();
     const tzOffset  = today.getTimezoneOffset() * 60000;
     const localToday = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
 
-    // Pasang batas max pada input
     filterEl.max = localToday;
 
-    // Tolak jika memilih tanggal masa depan
     if (filterEl.value > localToday) {
         showToast("⚠️ Tidak bisa melihat data tanggal masa depan", "warning");
         filterEl.value = localToday;
@@ -71,7 +126,6 @@ async function fetchByDate() {
     const listEl = $('listHariIni');
     if (listEl) listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat data...</div>`;
     try {
-        // FIX: Ganti fetch(APP_URL) → sb_initData()
         const data = await sb_initData(filterEl.value);
         if (data.pasien) allPatients = data.pasien;
         kunjunganHariIni = data.hariIni || [];
@@ -99,41 +153,157 @@ function renderKunjunganHariIni() {
         return String(a.waktu || "00:00").localeCompare(String(b.waktu || "00:00"));
     });
 
+    // Tentukan jabatan user yang login
+    const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
+    const isApoteker = jabatan === 'apoteker';
+    const isKasir    = jabatan === 'kasir';
+    const isAtlm     = jabatan === 'atlm';
+    const isParamedis = window._isParamedis === true;
+
     container.innerHTML = sorted.map(h => {
-        const isDone    = h.status === 'Selesai';
-        const diagRow   = window._isParamedis ? '' : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
-        // FIX: Jika h.nama kosong (join gagal di sb_initData), cari dari allPatients
+        const isDone     = h.status === 'Selesai';
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
-        // Tampilkan nama dokter pemeriksa jika ada (sudah di-resolve di sb_initData)
+
+        // Lab row — tampilkan ke ATLM, Apoteker juga bisa lihat
+        const hasLab = h.lab_gds || h.lab_chol || h.lab_ua;
+        const labRow = hasLab
+            ? `<div style="font-size:10.5px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:3px 7px;border-radius:6px;margin-top:3px;">
+                 🔬 GDS: ${h.lab_gds||'—'} | Kol: ${h.lab_chol||'—'} | AU: ${h.lab_ua||'—'}
+               </div>`
+            : '';
+
+        const diagRow = (isParamedis || isApoteker || isKasir || isAtlm)
+            ? ''
+            : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
+
         const dokterRow = h.dokterNama
             ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:2px;">👨‍⚕️ dr. ${h.dokterNama}</div>`
             : '';
+
+        // Status penanda obat & bayar
+        const st       = _getStatusKunjungan(h.id);
+        const obatDone = st.obat;
+        const bayarDone= st.bayar;
+
+        // Tombol aksi cepat — sesuai jabatan
+        let actionBtns = '';
+
+        // Tombol Invoice — tampil untuk Kasir, Admin, Dokter (bukan Paramedis & ATLM)
+        if (!isParamedis && !isAtlm) {
+            actionBtns += `
+            <button onclick="event.stopPropagation();_quickInvoice('${h.id}','${escHtml(tampilNama)}')"
+                style="flex:1;padding:5px 0;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
+                🧾 Invoice
+            </button>`;
+        }
+
+        // Tombol Resep — tampil untuk Apoteker, Dokter, Admin (tidak untuk Kasir & ATLM)
+        if (!isKasir && !isAtlm) {
+            actionBtns += `
+            <button onclick="event.stopPropagation();_quickResep('${h.id}','${escHtml(tampilNama)}')"
+                style="flex:1;padding:5px 0;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
+                💊 Resep
+            </button>`;
+        }
+
+        // Badge status obat (Apoteker & semua lihat, hanya Apoteker & Admin bisa toggle)
+        const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
+        const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
+
+        const badgeObat = `
+        <span id="badge_obat_${h.id}"
+            onclick="${canToggleObat ? `toggleStatusKunjungan(event,'${h.id}','obat')` : 'event.stopPropagation()'}"
+            style="cursor:${canToggleObat ? 'pointer' : 'default'};
+                   display:inline-flex;align-items:center;gap:3px;
+                   padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;
+                   ${_badgeStyle('obat', obatDone)}opacity:${obatDone ? '1' : '0.55'};">
+            ${_badgeHtml('obat', obatDone)}
+        </span>`;
+
+        const badgeBayar = `
+        <span id="badge_bayar_${h.id}"
+            onclick="${canToggleBayar ? `toggleStatusKunjungan(event,'${h.id}','bayar')` : 'event.stopPropagation()'}"
+            style="cursor:${canToggleBayar ? 'pointer' : 'default'};
+                   display:inline-flex;align-items:center;gap:3px;
+                   padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;
+                   ${_badgeStyle('bayar', bayarDone)}opacity:${bayarDone ? '1' : '0.55'};">
+            ${_badgeHtml('bayar', bayarDone)}
+        </span>`;
+
         return `
-        <div class="visit-card" style="opacity:${isDone ? '0.62' : '1'};" onclick="bukaRekamMedisHariIni('${h.id}')">
-            <div class="visit-time-badge">${h.waktu || '-'}</div>
-            <div style="flex:1; min-width:0;">
-                <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tampilNama}</div>
-                <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">Keluhan: ${h.keluhan || '-'}</div>
-                <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C</div>
-                ${diagRow}
-                ${dokterRow}
+        <div class="visit-card" style="opacity:${isDone ? '0.72' : '1'};flex-direction:column;gap:0;padding:10px 12px;" onclick="bukaRekamMedisHariIni('${h.id}')">
+            <div style="display:flex;align-items:flex-start;gap:10px;width:100%;">
+                <div class="visit-time-badge" style="flex-shrink:0;">${h.waktu || '-'}</div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tampilNama}</div>
+                    <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">Keluhan: ${h.keluhan || '-'}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C | N: ${h.nadi || '-'}</div>
+                    ${labRow}
+                    ${diagRow}
+                    ${dokterRow}
+                </div>
+                <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}" style="flex-shrink:0;">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
             </div>
-            <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
+
+            <!-- Baris status penanda + tombol aksi -->
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--border);" onclick="event.stopPropagation()">
+                ${badgeObat}
+                ${badgeBayar}
+                <div style="flex:1;"></div>
+                ${actionBtns}
+            </div>
         </div>`;
     }).join('');
 }
 
+/** Buka invoice langsung dari card kunjungan */
+function _quickInvoice(kId, namaPasien) {
+    const tgl = $('filterDate') ? $('filterDate').value : '';
+    if (typeof lihatTagihanKunjungan === 'function') {
+        lihatTagihanKunjungan(kId, namaPasien, tgl);
+    } else {
+        showToast("⚠️ Modul biaya belum dimuat", "warning");
+    }
+}
+
+/** Tampilkan resep dari kunjungan secara ringkas */
+async function _quickResep(kId, namaPasien) {
+    try {
+        const items = await sb_getResepByKunjungan(kId);
+        if (!items || items.length === 0) {
+            showToast(`ℹ️ Belum ada resep untuk ${namaPasien}`, 'info');
+            return;
+        }
+        const resepText = items.map((r, i) =>
+            `${i+1}. ${r.nama_obat} — ${r.jumlah} ${r.obat?.satuan || 'tablet'} (${r.frekuensi || ''})`
+        ).join('\n');
+        alert(`💊 Resep — ${namaPasien}\n\n${resepText}\n\nTotal item: ${items.length}`);
+    } catch(e) {
+        showToast("❌ Gagal memuat resep: " + (e.message || ''), "error");
+    }
+}
+
 // ── BUKA REKAM MEDIS DARI KUNJUNGAN HARI INI ──
 async function bukaRekamMedisHariIni(kId) {
+    // Kasir dan ATLM tidak bisa buka pageMedis penuh, redirect ke invoice/info saja
+    const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
+    if (jabatan === 'kasir') {
+        const h = kunjunganHariIni.find(x => x.id === kId);
+        const nama = h ? (h.nama || '') : '';
+        _quickInvoice(kId, nama);
+        return;
+    }
+    if (jabatan === 'atlm') {
+        showToast("ℹ️ ATLM hanya dapat melihat data lab dari daftar kunjungan", "info");
+        return;
+    }
+
     if (!canAccessMedis()) return;
 
     const h = kunjunganHariIni.find(x => x.id === kId);
     if (!h) return showToast("❌ Data tidak ditemukan", "error");
 
-    // FIX: Cari pasien di allPatients — coba via pasienId dulu, lalu via nama
     const p = allPatients.find(x => x.id === h.pasienId) || allPatients.find(x => x.nama && h.nama && x.nama === h.nama);
-
-    // FIX: Pastikan namaPasien selalu terisi — prioritas: dari pasien DB, lalu dari h.nama
     const namaPasien = (p && p.nama) ? p.nama : (h.nama || '');
 
     if (p) {
@@ -142,7 +312,6 @@ async function bukaRekamMedisHariIni(kId) {
         if ($('jk'))        $('jk').value         = p.jk     || 'L';
         if ($('alamat'))    $('alamat').value     = p.alamat || '';
         if ($('tgl_lahir')) $('tgl_lahir').value  = formatTglIndo(p.tgl) || '';
-        // Alergi diambil dari data pasien (permanen), bukan kunjungan
         if ($('alergi'))    $('alergi').value     = p.alergi || '';
         localStorage.setItem('rme_alergi', p.alergi || '');
     } else {
@@ -158,253 +327,152 @@ async function bukaRekamMedisHariIni(kId) {
     if ($('infoPasienUmur')) $('infoPasienUmur').innerText = "Umur: " + umur;
 
     const fVal = $('filterDate') ? $('filterDate').value : '';
-    const tanggalRekamLabel = fVal ? "Tgl: " + formatTglIndo(fVal) : "Tgl: " + h.tgl;
-    if ($('infoTglPemeriksaan')) {
-        $('infoTglPemeriksaan').innerText     = tanggalRekamLabel;
+    if ($('infoTglPemeriksaan') && fVal) {
+        $('infoTglPemeriksaan').innerText     = "Tgl: " + formatTglIndo(fVal);
         $('infoTglPemeriksaan').style.display = 'block';
     }
 
-    // FIX: Data di array kunjunganHariIni (dari sb_initData) hanya berisi field ringkas
-    // (td, suhu, keluhan, diag) — field seperti nadi, rr, bb, tb, lab_gds, lab_chol,
-    // lab_ua, fisik, terapi, surat_sakit tidak ikut di-map.
-    // Solusi: fetch data kunjungan lengkap dari Supabase via sb_getKunjunganById()
-    // sebelum mengisi form, agar semua field tampil dengan benar.
-    try {
-        const kunjunganLengkap = await sb_getKunjunganById(kId);
-        _isiFormDariKunjungan(kunjunganLengkap || h);
-    } catch (e) {
-        console.warn('[Klikpro] Gagal fetch kunjungan lengkap, fallback ke data ringkas:', e.message);
-        _isiFormDariKunjungan(h);
-    }
-    document.querySelectorAll('[data-save="true"]').forEach(el => localStorage.setItem('rme_' + el.id, el.value));
-    calculateIMT(); checkTensi(); checkLabAlert();
-
+    localStorage.setItem('cP_id',    currentPasienId    || '');
+    localStorage.setItem('cK_id',    currentKunjunganId || '');
+    localStorage.setItem('cP_nama',  namaPasien);
+    localStorage.setItem('cP_nik',   p ? (p.nik || '') : '');
+    localStorage.setItem('cP_umur',  "Umur: " + umur);
+    localStorage.setItem('cTglEdit', fVal ? "Tgl: " + formatTglIndo(fVal) : '');
     localStorage.setItem('activePage', 'pageMedis');
-    localStorage.setItem('cP_id',     currentPasienId);
-    localStorage.setItem('cK_id',     currentKunjunganId);
-    localStorage.setItem('cP_nama',   namaPasien);
-    localStorage.setItem('cP_nik',    "NIK: " + (p ? (p.nik || '-') : '-'));
-    localStorage.setItem('cP_umur',   "Umur: " + umur);
-    localStorage.setItem('cTglEdit',  tanggalRekamLabel);
 
-    if ($('historyListMedis')) {
-        $('historyListMedis').innerHTML =
-            `<div class="empty-state"><div class="empty-icon">⏳</div>Memuat riwayat...</div>`;
+    try {
+        const kunjunganData = await sb_getKunjunganById(currentKunjunganId);
+        if (kunjunganData && typeof _isiFormDariKunjungan === 'function') {
+            _isiFormDariKunjungan(kunjunganData);
+        } else {
+            if (typeof loadAutosave === 'function') loadAutosave();
+        }
+    } catch(e) {
+        if (typeof loadAutosave === 'function') loadAutosave();
     }
+
+    try {
+        let riwayatRows = [];
+        if (currentPasienId) {
+            riwayatRows = await _sbFetch(
+                `kunjungan?pasien_id=eq.${currentPasienId}&order=tgl.desc,waktu.desc&select=*,dokter(nama_dokter)`
+            );
+        }
+        currentRiwayat = riwayatRows.map(r => ({
+            id:           r.id,
+            tgl:          r.tgl,
+            waktu:        r.waktu,
+            td:           r.td,
+            nadi:         r.nadi,
+            suhu:         r.suhu,
+            rr:           r.rr,
+            bb:           r.bb,
+            tb:           r.tb,
+            keluhan:      r.keluhan,
+            fisik:        r.fisik,
+            lab_gds:      r.lab_gds,
+            lab_chol:     r.lab_chol,
+            lab_ua:       r.lab_ua,
+            diag:         r.diag,
+            terapi:       r.terapi,
+            status:       r.status,
+            user_id:      r.user_id,
+            dokter_id:    r.dokter_id,
+            dokterNama:   r.dokter?.nama_dokter || ''
+        }));
+        localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
+        if (typeof renderRiwayatList === 'function') renderRiwayatList(currentRiwayat, 'historyListMedis');
+    } catch(e) {
+        currentRiwayat = [];
+        try { currentRiwayat = JSON.parse(localStorage.getItem('cP_riwayat') || '[]'); } catch(e2) {}
+        if (typeof renderRiwayatList === 'function') renderRiwayatList(currentRiwayat, 'historyListMedis');
+    }
+
+    calculateIMT();
+    checkTensi();
+    checkLabAlert();
+
+    if (typeof _renderSectionLabDinamic === 'function') _renderSectionLabDinamic();
+
     switchPage('pageMedis', null);
-
-    try {
-        const today        = new Date();
-        const tzOffset     = today.getTimezoneOffset() * 60000;
-        const localDateStr = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
-        // FIX: Ganti fetch(APP_URL) → sb_checkAndUpsertPasien()
-        const data = await sb_checkAndUpsertPasien({
-            nama: h.nama,
-            nik:  p ? (p.nik || '') : '',
-            localDate: localDateStr
-        });
-        if (data && data.riwayat) {
-            currentRiwayat = data.riwayat;
-            renderRiwayatList(currentRiwayat, 'historyListMedis');
-            localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
-        } else {
-            if ($('historyListMedis')) {
-                $('historyListMedis').innerHTML =
-                    `<div class="empty-state"><div class="empty-icon">📂</div>Belum ada riwayat.</div>`;
-            }
-        }
-    } catch (e) {
-        if ($('historyListMedis')) {
-            $('historyListMedis').innerHTML =
-                `<div class="empty-state"><div class="empty-icon">⚠️</div>Gagal memuat riwayat.</div>`;
-        }
-    }
 }
 
-// ── SIMPAN REKAM MEDIS ──
-async function saveAll() {
-    const d1     = $('diagnosa')  ? $('diagnosa').value.trim()  : '';
-    const d2     = $('diagnosa2') ? $('diagnosa2').value.trim() : '';
-    const terapi = $('terapi')    ? $('terapi').value.trim()    : '';
-    const hasData = ['sistol','diastol','nadi','suhu','rr','bb','tb','lab_gds','lab_chol','lab_ua'].some(id => $(id) && $(id).value !== "");
-
-    if (!d1 && !hasData) return showToast("⚠️ Isi Diagnosa Utama atau Tanda Vital!", "error");
-
-    // ── VALIDASI NILAI VITAL ──
-    const vErrors = validasiNilaiVital();
-    if (vErrors.length > 0) {
-        showToast("⚠️ " + vErrors[0], "error");
-        if (vErrors.length > 1) {
-            vErrors.slice(1).forEach((msg, i) => {
-                setTimeout(() => showToast("⚠️ " + msg, "error"), (i + 1) * 800);
-            });
-        }
-        return;
-    }
-
-    const isSelesai = (d1 !== "" && terapi !== "");
-    const btn = $('btnSave');
-    if (btn) { btn.disabled = true; btn.innerText = "Menyimpan..."; }
-
-    const sis = $('sistol')  ? $('sistol').value  : '';
-    const dia = $('diastol') ? $('diastol').value : '';
-    const tdGabungan = (sis || dia) ? ((sis || '-') + '/' + (dia || '-')) : '';
-
-    // BUG B FIX: Helper konversi string kosong ke null untuk field numerik
-    const _num = id => { const el = $(id); return (el && el.value !== '') ? el.value : null; };
-
-    const today        = new Date();
-    const tzOffset     = today.getTimezoneOffset() * 60000;
-    const localDateStr = (new Date(today.getTime() - tzOffset)).toISOString().slice(0, 10);
-    const localTimeStr = String(today.getHours()).padStart(2, '0') + ':' + String(today.getMinutes()).padStart(2, '0');
-
-    const payload = {
-        action: "saveKunjungan",
-        pasienId:    currentPasienId,
-        kunjunganId: currentKunjunganId || "",
-        localDate:   localDateStr,
-        localTime:   localTimeStr,
-        // Simpan user_id dokter yang sedang login — dipakai untuk info dokter pemeriksa (Satu Sehat)
-        userId: (typeof loggedInUser !== 'undefined' && loggedInUser && loggedInUser.id)
-                ? loggedInUser.id : null,
-        nik:      $('nik')      ? $('nik').value      : '',
-        nama:     $('nama')     ? $('nama').value     : '',
-        tgl_lahir: $('tgl_lahir') ? $('tgl_lahir').value : '',
-        jk:       $('jk')       ? $('jk').value       : 'L',
-        alamat:   $('alamat')   ? $('alamat').value   : '',
-        td:       tdGabungan || null,
-        nadi:     _num('nadi'),
-        rr:       _num('rr'),
-        suhu:     _num('suhu'),
-        bb:       _num('bb'),
-        tb:       _num('tb'),
-        lab_gds:  _num('lab_gds'),
-        lab_chol: _num('lab_chol'),
-        lab_ua:   _num('lab_ua'),
-        // Darah rutin
-        lab_hb:          _num('lab_hb'),
-        lab_trombosit:   _num('lab_trombosit'),
-        lab_leukosit:    _num('lab_leukosit'),
-        lab_eritrosit:   _num('lab_eritrosit'),
-        lab_hematokrit:  _num('lab_hematokrit'),
-        // Triple eliminasi
-        lab_hiv:       $('lab_hiv')      ? $('lab_hiv').value      : null,
-        lab_sifilis:   $('lab_sifilis')  ? $('lab_sifilis').value  : null,
-        lab_hepatitis: $('lab_hepatitis')? $('lab_hepatitis').value : null,
-        // Profil lemak
-        lab_hdl: _num('lab_hdl'),
-        lab_ldl: _num('lab_ldl'),
-        lab_tg:  _num('lab_tg'),
-        // Gula darah
-        lab_gdp:   _num('lab_gdp'),
-        lab_hba1c: _num('lab_hba1c'),
-        // Fungsi hati
-        lab_sgot: _num('lab_sgot'),
-        lab_sgpt: _num('lab_sgpt'),
-        // Fungsi ginjal
-        lab_ureum:    _num('lab_ureum'),
-        lab_creatinin:_num('lab_creatinin'),
-        keluhan:  $('keluhan')  ? $('keluhan').value  : '',
-        fisik:    $('fisik')    ? $('fisik').value    : '',
-        alergi:   $('alergi')   ? $('alergi').value.trim()  : '',
-        // BUG B FIX: diagnosa1 & diagnosa2 dikirim terpisah (bukan digabung dengan |)
-        diagnosa:  d1,
-        diagnosa2: d2,
-        terapi:   terapi,
-        suratSakit: ($('suratSakit') && $('suratSakit').checked) ? "YA" : "TIDAK"
-    };
-
-    try {
-        // FIX: Ganti fetch(APP_URL) → sb_saveKunjungan()
-        const result = await sb_saveKunjungan(payload);
-
-        if (result && result.status === "Sukses") {
-            if (!currentKunjunganId && result.kunjunganId) {
-                currentKunjunganId = result.kunjunganId;
-            }
-
-            // Simpan & kurangi stok resep jika modul aktif
-            if (window._stokAktif && typeof simpanResepKunjungan === 'function') {
-                await simpanResepKunjungan(currentKunjunganId).catch(() => {});
-            }
-
-            // BUG FIX: Update status di array lokal secara optimistis
-            // agar tampilan Kunjungan Hari Ini langsung berubah tanpa menunggu refetch
-            if (isSelesai && currentKunjunganId) {
-                const idx = kunjunganHariIni.findIndex(x => x.id === currentKunjunganId);
-                if (idx !== -1) kunjunganHariIni[idx].status = 'Selesai';
-            }
-
-            if (isSelesai) {
-                showToast("✅ Rekam medis selesai & tersimpan!", "success");
-                if (btn) btn.innerText = "✓ Tersimpan!";
-                if (typeof resetResepSession === 'function') resetResepSession();
-                clearSession();
-
-                // Buka modal tagihan otomatis setelah simpan selesai
-                if (window._biayaAktif && typeof openModalTagihan === 'function') {
-                    const _pasienNama = $('nama') ? $('nama').value : '';
-                    openModalTagihan(
-                        currentKunjunganId,
-                        currentPasienId,
-                        _pasienNama,
-                        payload.localDate,
-                        payload
-                    ).catch(() => {});
-                }
-
-                setTimeout(() => {
-                    currentPasienId = null; currentKunjunganId = null; currentRiwayat = [];
-                    ['nama','nik','alamat','tgl_lahir'].forEach(id => { if ($(id)) $(id).value = ''; });
-                    if ($('jk')) $('jk').value = 'L';
-                    if (btn) { btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis"; }
-                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
-                    const firstNav = document.querySelector('.nav-item');
-                    if (firstNav) firstNav.classList.add('active-nav');
-                    switchPage('pageDaftar', null);
-                    fetchByDate();
-                }, 1400);
-            } else {
-                showToast("✅ Data tersimpan sementara", "success");
-                if (btn) btn.innerText = "✓ Disimpan!";
-                setTimeout(() => {
-                    if (btn) { btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis"; }
-                }, 1400);
-            }
-        } else {
-            throw new Error(result.error || "Gagal menyimpan");
-        }
-    } catch (e) {
-        showToast("❌ Gagal menyimpan: " + (e.message || ''), "error");
-        if (btn) { btn.disabled = false; btn.innerText = "✓ Simpan Rekam Medis"; }
-    }
+// ── ESCAPE HTML ──
+function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── RENDER RIWAYAT KUNJUNGAN ──
-function renderRiwayatList(riwayatArr, containerId) {
+// ════════════════════════════════════════════════════════
+//  RENDER LIST RIWAYAT (HISTORY)
+// ════════════════════════════════════════════════════════
+function renderRiwayatList(list, containerId) {
     const c = $(containerId);
     if (!c) return;
-    if (riwayatArr && riwayatArr.length > 0) {
-        c.innerHTML = '<div class="section-divider"><span>Riwayat Kunjungan</span></div>' +
-            riwayatArr.map((r, i) => `
-                <div class="riwayat-item" onclick="openModal(${i})">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <div class="riwayat-date">📅 ${r.tgl ? formatTglIndo(r.tgl) : '-'} <span style="color:var(--text-muted); font-weight:normal;">${r.waktu ? '(' + r.waktu + ')' : ''}</span></div>
+
+    if (list && list.length > 0) {
+        c.innerHTML = list.map((r, i) => {
+            const labStr = [
+                r.lab_gds  ? `GDS ${r.lab_gds}`   : '',
+                r.lab_chol ? `Kol ${r.lab_chol}`  : '',
+                r.lab_ua   ? `AU ${r.lab_ua}`      : ''
+            ].filter(Boolean).join(' | ');
+
+            const st       = r.id ? _getStatusKunjungan(r.id) : { obat: false, bayar: false };
+            const obatDone = st.obat;
+            const bayarDone= st.bayar;
+
+            const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
+            const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
+            const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
+
+            const badgeObat = r.id ? `
+            <span id="badge_obat_${r.id}"
+                onclick="${canToggleObat ? `event.stopPropagation();toggleStatusKunjungan(event,'${r.id}','obat')` : 'event.stopPropagation()'}"
+                style="cursor:${canToggleObat ? 'pointer' : 'default'};
+                       display:inline-flex;align-items:center;gap:2px;
+                       padding:2px 7px;border-radius:20px;font-size:9.5px;font-weight:700;
+                       ${_badgeStyle('obat', obatDone)}opacity:${obatDone ? '1' : '0.5'};">
+                ${_badgeHtml('obat', obatDone)}
+            </span>` : '';
+
+            const badgeBayar = r.id ? `
+            <span id="badge_bayar_${r.id}"
+                onclick="${canToggleBayar ? `event.stopPropagation();toggleStatusKunjungan(event,'${r.id}','bayar')` : 'event.stopPropagation()'}"
+                style="cursor:${canToggleBayar ? 'pointer' : 'default'};
+                       display:inline-flex;align-items:center;gap:2px;
+                       padding:2px 7px;border-radius:20px;font-size:9.5px;font-weight:700;
+                       ${_badgeStyle('bayar', bayarDone)}opacity:${bayarDone ? '1' : '0.5'};">
+                ${_badgeHtml('bayar', bayarDone)}
+            </span>` : '';
+
+            return `
+                <div class="riwayat-item" onclick="openModal(${i})" style="cursor:pointer; padding:10px 12px; border-bottom:1px solid var(--border);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                        <div style="font-size:12px; font-weight:700; color:var(--primary);">
+                            📅 ${formatTglIndo(r.tgl)} (${r.waktu || '00:00'})
+                        </div>
                         <div style="display:flex;gap:6px;align-items:center;">
-                        <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
-                        ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
-                    </div>
+                            <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaResepRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-nama="${escHtml(r.namaPasien||'')}" style="padding:2px 7px;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">💊 Resep</button>` : ''}
+                        </div>
                     </div>
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
                         <b>TTV:</b> TD ${r.td||'-'} | N ${r.nadi||'-'} | S ${r.suhu||'-'} | RR ${r.rr||'-'} | BB ${r.bb||'-'}
                     </div>
-                    ${(r.lab_gds||r.lab_chol||r.lab_ua) ? `<div style="font-size:11px;margin-bottom:6px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:4px 8px;border-radius:8px;"><b>🔬 Lab:</b> GDS ${r.lab_gds||'-'} | Chol ${r.lab_chol||'-'} | AU ${r.lab_ua||'-'}</div>` : ''}
+                    ${labStr ? `<div style="font-size:11px;margin-bottom:6px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:4px 8px;border-radius:8px;"><b>🔬 Lab:</b> ${labStr}</div>` : ''}
                     ${window._isParamedis ? '' : `<div class="riwayat-diag" style="margin-bottom:3px;">🩺 ${r.diag || 'Menunggu Diagnosa'}</div>`}
                     <div class="riwayat-keluhan" style="color:var(--text); border-top:1px dashed var(--border); padding-top:4px; margin-bottom:3px;"><b>Keluhan:</b> ${r.keluhan || '-'}</div>
-                    <div class="riwayat-keluhan" style="color:var(--text);"><b>Terapi:</b> ${r.terapi || '-'}</div>
-                    ${r.dokterNama ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);">👨‍⚕️ Diperiksa oleh: ${r.dokterNama}</div>` : ''}
+                    <div class="riwayat-keluhan" style="color:var(--text);margin-bottom:6px;"><b>Terapi:</b> ${r.terapi || '-'}</div>
+                    ${r.dokterNama ? `<div style="font-size:10px;color:#059669;font-weight:600;padding-top:4px;border-top:1px dashed var(--border);">👨‍⚕️ Diperiksa oleh: ${r.dokterNama}</div>` : ''}
+                    <!-- Penanda status -->
+                    <div style="display:flex;gap:5px;align-items:center;margin-top:7px;padding-top:5px;border-top:1px dashed var(--border);" onclick="event.stopPropagation()">
+                        ${badgeObat}
+                        ${badgeBayar}
+                    </div>
                 </div>
-            `).join('');
+            `;
+        }).join('');
     } else {
         c.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div>Belum ada riwayat.</div>`;
     }
@@ -414,7 +482,6 @@ function renderRiwayatList(riwayatArr, containerId) {
 //  DYNAMIC LAB SECTION — render berdasarkan window._labAktif
 // ════════════════════════════════════════════════════════
 
-// Definisi lengkap semua field lab (mirror dari settings.js LAB_GROUPS)
 const ALL_LAB_FIELDS = [
     { id: 'lab_gds',       label: 'GDS',           unit: 'mg/dL',    step: '1',   group: 'dasar' },
     { id: 'lab_chol',      label: 'Kolesterol',     unit: 'mg/dL',    step: '1',   group: 'dasar' },
@@ -438,7 +505,6 @@ const ALL_LAB_FIELDS = [
     { id: 'lab_creatinin', label: 'Kreatinin',      unit: 'mg/dL',    step: '0.01',group: 'ginjal' },
 ];
 
-// Grup label untuk tampilan
 const LAB_GROUP_LABELS = {
     dasar:       '🩸 Lab Dasar',
     darah_rutin: '🔴 Darah Rutin',
@@ -453,7 +519,6 @@ function _renderSectionLabDinamic() {
     const section = $('sectionLab');
     if (!section) return;
 
-    // Render resep section jika modul stok aktif
     if (window._stokAktif && typeof renderSectionResep === 'function') {
         renderSectionResep(currentKunjunganId || null);
         const secResep  = document.getElementById('sectionResep');
@@ -471,7 +536,6 @@ function _renderSectionLabDinamic() {
     }
     section.style.display = '';
 
-    // Kelompokkan per group
     const grouped = {};
     activeFields.forEach(f => {
         if (!grouped[f.group]) grouped[f.group] = [];
@@ -509,13 +573,11 @@ function _renderSectionLabDinamic() {
 
     section.innerHTML = html;
 
-    // Re-bind autosave & event listeners untuk field baru
     section.querySelectorAll('[data-save="true"]').forEach(el => {
         el.addEventListener('input', () => {
             localStorage.setItem('rme_' + el.id, el.value);
             checkLabAlert();
         });
-        // Restore nilai dari localStorage
         const saved = localStorage.getItem('rme_' + el.id);
         if (saved !== null) el.value = saved;
     });
@@ -524,15 +586,32 @@ function _renderSectionLabDinamic() {
 }
 
 // ── Helper: buka invoice dari tombol di riwayat list ──
-// Pakai data-attribute bukan inline string untuk hindari masalah quote/escape
 function _bukaInvoiceRiwayat(btn) {
     const kunjId = btn.getAttribute('data-kunjid');
     const tgl    = btn.getAttribute('data-tgl');
-    // Nama pasien ambil dari state global yang sudah ada
     const nama   = (typeof allPatients !== 'undefined' && currentPasienId)
         ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
         : '';
     if (typeof lihatTagihanKunjungan === 'function') {
         lihatTagihanKunjungan(kunjId, nama, tgl);
+    }
+}
+
+/** Helper: buka resep dari tombol di riwayat list */
+async function _bukaResepRiwayat(btn) {
+    const kunjId = btn.getAttribute('data-kunjid');
+    const nama   = btn.getAttribute('data-nama') || '';
+    try {
+        const items = await sb_getResepByKunjungan(kunjId);
+        if (!items || items.length === 0) {
+            showToast('ℹ️ Tidak ada resep pada kunjungan ini', 'info');
+            return;
+        }
+        const resepText = items.map((r, i) =>
+            `${i+1}. ${r.nama_obat} — ${r.jumlah} ${r.obat?.satuan || 'tablet'} (${r.frekuensi || ''})`
+        ).join('\n');
+        alert(`💊 Resep — ${nama}\n\n${resepText}`);
+    } catch(e) {
+        showToast("❌ Gagal memuat resep", "error");
     }
 }

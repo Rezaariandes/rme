@@ -10,9 +10,14 @@ let userListCache = [];
 function renderJabatanSelect() {
     const sel = $('u_jabatan');
     if (!sel) return;
+    // Jabatan default mencakup semua peran baru
+    const jabDefault = ['Dokter', 'Admin', 'Paramedis', 'Apoteker', 'Kasir', 'ATLM'];
     const jabList = (typeof JABATAN_MEDIS !== 'undefined' && Array.isArray(JABATAN_MEDIS) && JABATAN_MEDIS.length > 0)
         ? JABATAN_MEDIS
-        : ['Dokter', 'Admin', 'Paramedis'];
+        : jabDefault;
+    // Pastikan jabatan baru selalu ada meski tidak di list lama
+    const jabatanTambahan = ['Apoteker', 'Kasir', 'ATLM'];
+    jabatanTambahan.forEach(j => { if (!jabList.includes(j)) jabList.push(j); });
     // Pastikan 'Sudah Resign' selalu tersedia sebagai opsi terakhir
     const jabListWithResign = jabList.includes('Sudah Resign') ? jabList : [...jabList, 'Sudah Resign'];
     const current = sel.value;
@@ -67,28 +72,46 @@ function renderUserList() {
     const resign = userListCache.filter(u => (u.jabatan || '').toLowerCase() === 'sudah resign');
 
     const renderCard = (u) => {
-        const isDokter = u.jabatan && u.jabatan.toLowerCase() === 'dokter';
-        const isResign = u.jabatan && u.jabatan.toLowerCase() === 'sudah resign';
+        const isDokter   = u.jabatan && u.jabatan.toLowerCase() === 'dokter';
+        const isResign   = u.jabatan && u.jabatan.toLowerCase() === 'sudah resign';
+        const isApoteker = u.jabatan && u.jabatan.toLowerCase() === 'apoteker';
+        const isKasir    = u.jabatan && u.jabatan.toLowerCase() === 'kasir';
+        const isAtlm     = u.jabatan && u.jabatan.toLowerCase() === 'atlm';
+
+        const roleIcon = isDokter ? '👨‍⚕️' : isApoteker ? '💊' : isKasir ? '💰' : isAtlm ? '🔬' : isResign ? '🚪' : '👤';
 
         const badge = isDokter
             ? `<div class="status-badge" style="background:rgba(5,150,105,0.12);color:#065f46;border:1px solid rgba(5,150,105,0.25);font-size:10px;">👨‍⚕️ Dokter Pemeriksa</div>`
-            : isResign
-                ? `<div class="status-badge" style="background:rgba(107,114,128,0.12);color:#6b7280;border:1px solid rgba(107,114,128,0.25);font-size:10px;">🚪 Resign</div>`
-                : `<div class="status-badge status-wait">${u.jabatan}</div>`;
+            : isApoteker
+                ? `<div class="status-badge" style="background:rgba(124,58,237,0.12);color:#5b21b6;border:1px solid rgba(124,58,237,0.25);font-size:10px;">💊 Apoteker</div>`
+                : isKasir
+                    ? `<div class="status-badge" style="background:rgba(245,158,11,0.12);color:#92400e;border:1px solid rgba(245,158,11,0.25);font-size:10px;">💰 Kasir</div>`
+                    : isAtlm
+                        ? `<div class="status-badge" style="background:rgba(6,182,212,0.12);color:#155e75;border:1px solid rgba(6,182,212,0.25);font-size:10px;">🔬 ATLM</div>`
+                        : isResign
+                            ? `<div class="status-badge" style="background:rgba(107,114,128,0.12);color:#6b7280;border:1px solid rgba(107,114,128,0.25);font-size:10px;">🚪 Resign</div>`
+                            : `<div class="status-badge status-wait">${u.jabatan}</div>`;
 
         const cardStyle = isResign ? `opacity:0.6;background:rgba(107,114,128,0.05);` : '';
 
+        let subDesc = '';
+        if (isDokter)   subDesc = `<div style="font-size:10px;color:#059669;margin-top:2px;">✅ Kunjungan pasien akan tercatat atas nama dokter ini</div>`;
+        if (isApoteker) subDesc = `<div style="font-size:10px;color:#7c3aed;margin-top:2px;">💊 Akses resep & konfirmasi pemberian obat</div>`;
+        if (isKasir)    subDesc = `<div style="font-size:10px;color:#b45309;margin-top:2px;">💰 Akses invoice & konfirmasi pembayaran pasien</div>`;
+        if (isAtlm)     subDesc = `<div style="font-size:10px;color:#0891b2;margin-top:2px;">🔬 Akses input & lihat hasil laboratorium</div>`;
+        if (isResign)   subDesc = `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">📁 Data historis tetap tersimpan & dapat dilacak</div>`;
+
         return `
         <div class="visit-card" style="${cardStyle}" onclick="openEditUserModal('${u.id}')">
-            <div class="visit-time-badge" style="font-size:18px;">${isDokter ? '👨‍⚕️' : isResign ? '🚪' : '👤'}</div>
+            <div class="visit-time-badge" style="font-size:18px;">${roleIcon}</div>
             <div style="flex:1; min-width:0;">
                 <div style="font-weight:700; font-size:14px;${isResign ? 'text-decoration:line-through;color:var(--text-muted);' : ''}">${u.nama}</div>
                 <div style="font-size:11px; color:var(--text-muted);">${u.jabatan}</div>
-                ${isDokter ? `<div style="font-size:10px;color:#059669;margin-top:2px;">✅ Kunjungan pasien akan tercatat atas nama dokter ini</div>` : ''}
-                ${isResign ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px;">📁 Data historis tetap tersimpan & dapat dilacak</div>` : ''}
+                ${subDesc}
             </div>
             ${badge}
         </div>`;
+    };
     };
 
     let html = aktif.map(renderCard).join('');
@@ -186,9 +209,12 @@ function openEditUserModal(id) {
     // Populate dropdown jabatan di modal edit (termasuk Sudah Resign)
     const jabSel = $('edit_u_jabatan');
     if (jabSel) {
+        const jabDefault = ['Dokter', 'Admin', 'Paramedis', 'Apoteker', 'Kasir', 'ATLM'];
         const jabList = (typeof JABATAN_MEDIS !== 'undefined' && Array.isArray(JABATAN_MEDIS) && JABATAN_MEDIS.length > 0)
             ? JABATAN_MEDIS
-            : ['Dokter', 'Admin', 'Paramedis'];
+            : jabDefault;
+        const jabatanTambahan = ['Apoteker', 'Kasir', 'ATLM'];
+        jabatanTambahan.forEach(j => { if (!jabList.includes(j)) jabList.push(j); });
         const jabListWithResign = jabList.includes('Sudah Resign') ? jabList : [...jabList, 'Sudah Resign'];
         jabSel.innerHTML = jabListWithResign.map(j =>
             `<option value="${j}" ${j === u.jabatan ? 'selected' : ''}>${j}</option>`
