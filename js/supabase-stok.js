@@ -150,3 +150,4 @@ async function sb_getKategoriObat() {
     const unique = [...new Set(rows.map(r => r.kategori).filter(Boolean))];
     return unique;
 }
+
