@@ -1,3 +1,18 @@
+
+// ── Load logo dari localStorage segera saat halaman dimuat (sebelum settings fetch selesai)
+(function _earlyLogoApply() {
+    try {
+        const saved = localStorage.getItem('klikpro_logo');
+        if (!saved) return;
+        // Favicon
+        let fav = document.querySelector("link[rel~='icon']");
+        if (!fav) { fav = document.createElement('link'); fav.rel='icon'; document.head.appendChild(fav); }
+        fav.href = saved;
+        // Header img jika ada
+        const img = document.getElementById('appLogoImg');
+        if (img) { img.src = saved; img.style.display = ''; }
+    } catch(e) {}
+})();
 // ════════════════════════════════════════════════════════
 //  KLIKPRO RME — APP CONTROLLER
 //  Inisialisasi aplikasi, navigasi halaman, onload
@@ -60,7 +75,12 @@ async function loadRuntimeSettings() {
         const s = data.settings;
 
         if (s.klinik_nama)  window.KLINIK_NAMA  = s.klinik_nama;
-        window._settingsFull = s;  // expose for invoice print header
+        window._settingsFull = s;
+
+        // Terapkan logo klinik ke favicon & header
+        if (s.klinik_logo && typeof _applyLogoToApp === 'function') {
+            _applyLogoToApp(s.klinik_logo);
+        }  // expose for invoice print header
         if (s.klinik_title) window.KLINIK_TITLE = s.klinik_title;
         if (s.jabatan_medis) {
             const jabList = s.jabatan_medis.split(',').map(j => j.trim()).filter(j => j);
