@@ -139,6 +139,9 @@ async function loadRuntimeSettings() {
         const _navBiaya = document.getElementById('navBiaya');
         if (_navBiaya) _navBiaya.style.display = window._biayaAktif ? '' : 'none';
 
+        // Recalc nav layout setelah item ditampilkan/disembunyikan
+        if (typeof window._fitNav === 'function') setTimeout(window._fitNav, 200);
+
         // BUG F FIX: Terapkan hak akses modul setelah settings dimuat
         // applyModuleAccess dipanggil di sini (bukan hanya di auth.js) agar
         // window._isParamedis tersedia sebelum renderKunjunganHariIni dijalankan

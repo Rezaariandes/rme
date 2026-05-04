@@ -1734,6 +1734,7 @@ function _applyStokAktif(aktif) {
 
     window._stokAktif = aktif;
     if (aktif && typeof initStokModule === 'function') initStokModule();
+    if (typeof window._fitNav === 'function') setTimeout(window._fitNav, 100);
 }
 
 
@@ -1851,6 +1852,7 @@ function _applyBiayaAktif(aktif) {
     const navBiaya = document.getElementById('navBiaya');
     if (navBiaya) navBiaya.style.display = aktif ? '' : 'none';
     window._biayaAktif = aktif;
+    if (typeof window._fitNav === 'function') setTimeout(window._fitNav, 100);
 }
 
 

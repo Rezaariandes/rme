@@ -74,6 +74,13 @@ function renderDaftarObat() {
     }
 
     container.innerHTML = list.map(o => {
+        // Cek exp_date
+        const today = new Date(); today.setHours(0,0,0,0);
+        const expDate   = o.exp_date ? new Date(o.exp_date) : null;
+        const expDays   = expDate ? Math.floor((expDate - today)/(1000*60*60*24)) : null;
+        const isExpired = expDays !== null && expDays < 0;
+        const isExpSoon = expDays !== null && expDays >= 0 && expDays <= 90;
+
         const isKritis   = o.stok <= o.stok_minimum;
         const stokColor  = isKritis ? '#dc2626' : (o.stok <= o.stok_minimum * 2 ? '#d97706' : 'var(--success)');
         const stokBg     = isKritis ? 'rgba(220,38,38,0.07)' : 'rgba(22,163,74,0.06)';
@@ -93,6 +100,9 @@ function renderDaftarObat() {
                         <span style="color:${margin >= 0 ? 'var(--success)' : '#dc2626'}">Margin: ${margin}%</span>
                     </div>
                     ${o.keterangan ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">📌 ${escHtml(o.keterangan)}</div>` : ''}
+            ${expDate ? `<div style="font-size:10.5px;margin-top:3px;${isExpired ? 'color:#dc2626;font-weight:700;' : isExpSoon ? 'color:#d97706;font-weight:600;' : 'color:var(--text-muted);'}">
+                ${isExpired ? '🚫 KADALUARSA' : isExpSoon ? '⚠️ Exp Soon'  : '📅 Exp'}: ${_formatExpDate(o.exp_date)}
+            </div>` : ''}
                 </div>
                 <div style="text-align:center;flex-shrink:0;">
                     <div style="font-size:20px;font-weight:900;color:${stokColor};line-height:1;">${o.stok ?? 0}</div>
@@ -123,9 +133,11 @@ function renderDaftarObat() {
 function _renderStokSummary() {
     const el = document.getElementById('stokSummary');
     if (!el) return;
+    const today = new Date(); today.setHours(0,0,0,0);
     const total   = _obatCache.length;
     const kritis  = _obatCache.filter(o => (o.stok ?? 0) <= (o.stok_minimum ?? 5)).length;
     const nilaiStok = _obatCache.reduce((s, o) => s + ((o.stok ?? 0) * (o.harga_beli ?? 0)), 0);
+    const expired = _obatCache.filter(o => o.exp_date && new Date(o.exp_date) < today).length;
 
     const tile = (icon, label, val, color) =>
         `<div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:10px;text-align:center;">
@@ -137,6 +149,7 @@ function _renderStokSummary() {
     el.innerHTML =
         tile('💊', 'Total Jenis', total, 'var(--primary)') +
         tile('⚠️', 'Stok Kritis', kritis, kritis > 0 ? '#dc2626' : 'var(--success)') +
+        tile('🚫', 'Kadaluarsa', expired, expired > 0 ? '#dc2626' : 'var(--success)') +
         tile('💰', 'Nilai Stok', 'Rp ' + _fmt(nilaiStok), 'var(--primary-dark)');
 }
 
@@ -176,7 +189,7 @@ function closeModalObat() {
 
 function _clearFormObat() {
     ['obat_id','obat_nama','obat_kategori','obat_harga_beli','obat_harga_jual',
-     'obat_stok','obat_stok_minimum','obat_keterangan'].forEach(id => {
+     'obat_stok','obat_stok_minimum','obat_keterangan','obat_exp_date'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -197,6 +210,7 @@ function _isiFormObat(o) {
     _set('obat_stok',            o.stok);
     _set('obat_stok_minimum',    o.stok_minimum);
     _set('obat_keterangan',      o.keterangan);
+    _set('obat_exp_date',        o.exp_date ? o.exp_date.substring(0,7) : '');
     const fq = document.getElementById('obat_frekuensi_default');
     if (fq) fq.value = o.frekuensi_default || '3x1';
 }
@@ -205,6 +219,7 @@ async function simpanObat() {
     const nama = document.getElementById('obat_nama')?.value.trim();
     if (!nama) return showToast('⚠️ Nama obat wajib diisi', 'error');
 
+    const expRaw = document.getElementById('obat_exp_date')?.value; // format YYYY-MM
     const payload = {
         id:                 document.getElementById('obat_id')?.value || null,
         nama,
@@ -215,7 +230,8 @@ async function simpanObat() {
         stok:               document.getElementById('obat_stok')?.value             || 0,
         stok_minimum:       document.getElementById('obat_stok_minimum')?.value     || 5,
         frekuensi_default:  document.getElementById('obat_frekuensi_default')?.value || '3x1',
-        keterangan:         document.getElementById('obat_keterangan')?.value.trim() || null
+        keterangan:         document.getElementById('obat_keterangan')?.value.trim() || null,
+        exp_date:           expRaw ? expRaw + '-01' : null  // simpan sebagai DATE YYYY-MM-01
     };
 
     try {
@@ -544,4 +560,286 @@ function _fmt(n) {
 function _hitungMargin(beli, jual) {
     if (!beli || beli == 0) return jual > 0 ? 100 : 0;
     return Math.round(((jual - beli) / beli) * 100);
+}
+
+
+// ════════════════════════════════════════
+//  IMPORT OBAT DARI EXCEL
+// ════════════════════════════════════════
+
+/** Buka modal import Excel */
+function openModalImportObat() {
+    let modal = document.getElementById('modalImportObat');
+    if (!modal) {
+        modal = _buildModalImportObat();
+        document.body.appendChild(modal);
+    }
+    // Reset state
+    document.getElementById('importObatFile').value = '';
+    document.getElementById('importPreviewArea').innerHTML = '';
+    document.getElementById('btnKonfirmasiImport').style.display = 'none';
+    window._importObatRows = [];
+    modal.style.display = 'block';
+}
+
+function closeModalImportObat() {
+    const m = document.getElementById('modalImportObat');
+    if (m) m.style.display = 'none';
+}
+
+function _buildModalImportObat() {
+    const div = document.createElement('div');
+    div.id = 'modalImportObat';
+    div.style.cssText = 'display:none;position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,0.5);overflow-y:auto;padding:16px;';
+    div.innerHTML = `
+    <div style="background:#fff;border-radius:18px;max-width:520px;margin:0 auto;padding:22px 20px;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="font-size:15px;font-weight:800;color:var(--primary-dark);">📥 Import Obat dari Excel</div>
+            <button onclick="closeModalImportObat()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);">✕</button>
+        </div>
+
+        <!-- Template download -->
+        <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--primary-dark);margin-bottom:6px;">📋 Format Kolom Excel</div>
+            <div style="font-size:10.5px;color:var(--text-muted);line-height:1.8;">
+                Baris pertama = header. Urutan kolom:<br>
+                <span style="font-family:monospace;background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:10px;">
+                nama | kategori | satuan | harga_beli | harga_jual | stok | stok_minimum | frekuensi_default | exp_date | keterangan
+                </span><br>
+                <span style="font-size:10px;">exp_date format: <b>YYYY-MM</b> (contoh: 2026-08) atau kosongkan</span>
+            </div>
+            <button onclick="_downloadTemplateExcel()" style="margin-top:8px;padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">
+                ⬇️ Download Template Excel
+            </button>
+        </div>
+
+        <!-- File picker -->
+        <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">Pilih File Excel (.xlsx / .xls / .csv)</label>
+            <input type="file" id="importObatFile" accept=".xlsx,.xls,.csv"
+                style="width:100%;padding:8px;border:1.5px dashed #e2e8f0;border-radius:10px;font-size:12px;cursor:pointer;"
+                onchange="_parseExcelObat(this)">
+        </div>
+
+        <!-- Preview -->
+        <div id="importPreviewArea" style="max-height:280px;overflow-y:auto;margin-bottom:12px;"></div>
+
+        <!-- Tombol konfirmasi -->
+        <div style="display:flex;gap:8px;">
+            <button id="btnKonfirmasiImport" onclick="_eksekusiImportObat()"
+                style="display:none;flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+                ✅ Import Sekarang
+            </button>
+            <button onclick="closeModalImportObat()" style="padding:11px 16px;background:#f1f5f9;color:var(--text);border:none;border-radius:10px;font-size:12px;cursor:pointer;">
+                Batal
+            </button>
+        </div>
+    </div>`;
+    return div;
+}
+
+/** Parse file Excel / CSV menggunakan SheetJS */
+async function _parseExcelObat(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const preview = document.getElementById('importPreviewArea');
+    preview.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px;">⏳ Membaca file...</div>';
+
+    try {
+        // Load SheetJS dari CDN jika belum ada
+        if (typeof XLSX === 'undefined') {
+            await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        }
+
+        const buf  = await file.arrayBuffer();
+        const wb   = XLSX.read(buf, { type: 'array', cellDates: true });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const raw  = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (raw.length === 0) {
+            preview.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:10px;">❌ File kosong atau format tidak dikenali.</div>';
+            return;
+        }
+
+        // Normalize: mapping fleksibel header kolom
+        const rows = raw.map((r, i) => _normalizeImportRow(r, i + 2));
+        const valid = rows.filter(r => r.nama && r.nama.trim());
+
+        window._importObatRows = valid;
+        _renderImportPreview(valid, rows.length - valid.length);
+
+    } catch(e) {
+        preview.innerHTML = `<div style="color:#dc2626;font-size:12px;padding:10px;">❌ Gagal membaca file: ${escHtml(e.message || '')}</div>`;
+        console.error('[Import Obat]', e);
+    }
+}
+
+/** Normalisasi baris Excel — toleran terhadap variasi nama header */
+function _normalizeImportRow(r, baris) {
+    const _get = (...keys) => {
+        for (const k of keys) {
+            const found = Object.keys(r).find(rk => rk.toLowerCase().replace(/\s+/g,'_') === k.toLowerCase());
+            if (found && r[found] !== '' && r[found] !== undefined) return String(r[found]).trim();
+        }
+        return '';
+    };
+
+    // Proses exp_date — bisa YYYY-MM, YYYY-MM-DD, atau Date object dari SheetJS
+    let expRaw = _get('exp_date','expired','kadaluarsa','tanggal_exp','expiry');
+    let expDate = null;
+    if (expRaw) {
+        if (expRaw instanceof Date || (typeof expRaw === 'object')) {
+            expDate = expRaw.toISOString().substring(0,7) + '-01';
+        } else if (/^\d{4}-\d{2}$/.test(expRaw)) {
+            expDate = expRaw + '-01';
+        } else if (/^\d{4}-\d{2}-\d{2}/.test(expRaw)) {
+            expDate = expRaw.substring(0,10);
+        } else if (/^\d{1,2}\/\d{4}$/.test(expRaw)) {
+            // format MM/YYYY
+            const [mm, yyyy] = expRaw.split('/');
+            expDate = `${yyyy}-${mm.padStart(2,'0')}-01`;
+        }
+    }
+
+    return {
+        _baris:           baris,
+        nama:             _get('nama','name','nama_obat'),
+        kategori:         _get('kategori','category','golongan') || 'Umum',
+        satuan:           _get('satuan','unit','kemasan') || 'tablet',
+        harga_beli:       Number(_get('harga_beli','modal','cost','harga beli').replace(/[^0-9.]/g,'')) || 0,
+        harga_jual:       Number(_get('harga_jual','harga','price','jual','harga jual').replace(/[^0-9.]/g,'')) || 0,
+        stok:             Number(_get('stok','stock','qty','jumlah').replace(/[^0-9.]/g,'')) || 0,
+        stok_minimum:     Number(_get('stok_minimum','min','minimum','min_stok').replace(/[^0-9.]/g,'')) || 5,
+        frekuensi_default:_get('frekuensi_default','frekuensi','dosis','dose') || '3x1',
+        exp_date:         expDate,
+        keterangan:       _get('keterangan','note','catatan','ket') || null
+    };
+}
+
+/** Render preview tabel sebelum import */
+function _renderImportPreview(rows, dilewati) {
+    const preview = document.getElementById('importPreviewArea');
+    const btn     = document.getElementById('btnKonfirmasiImport');
+
+    if (rows.length === 0) {
+        preview.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:10px;">❌ Tidak ada data valid. Pastikan kolom "nama" terisi.</div>';
+        btn.style.display = 'none';
+        return;
+    }
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    preview.innerHTML = `
+    <div style="font-size:11.5px;font-weight:700;color:var(--success);margin-bottom:8px;">
+        ✅ ${rows.length} obat siap diimport${dilewati > 0 ? ` · ⚠️ ${dilewati} baris dilewati (nama kosong)` : ''}
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
+        <thead>
+            <tr style="background:#f8fafc;">
+                <th style="padding:5px 8px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;">Nama</th>
+                <th style="padding:5px 8px;text-align:left;border-bottom:1px solid #e2e8f0;">Kat.</th>
+                <th style="padding:5px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">Stok</th>
+                <th style="padding:5px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">Jual</th>
+                <th style="padding:5px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">Exp</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${rows.map(r => {
+                const expD = r.exp_date ? new Date(r.exp_date) : null;
+                const isExp = expD && expD < today;
+                const isSoon = expD && !isExp && Math.floor((expD-today)/(1000*60*60*24)) <= 90;
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:5px 8px;font-weight:600;">${escHtml(r.nama)}</td>
+                    <td style="padding:5px 8px;color:var(--text-muted);">${escHtml(r.kategori)}</td>
+                    <td style="padding:5px 8px;text-align:right;">${r.stok}</td>
+                    <td style="padding:5px 8px;text-align:right;">Rp ${_fmt(r.harga_jual)}</td>
+                    <td style="padding:5px 8px;text-align:center;color:${isExp?'#dc2626':isSoon?'#d97706':'var(--text-muted)'};">
+                        ${r.exp_date ? _formatExpDate(r.exp_date) : '—'}${isExp?' 🚫':isSoon?' ⚠️':''}
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table>
+    </div>`;
+    btn.style.display = '';
+}
+
+/** Eksekusi import ke Supabase */
+async function _eksekusiImportObat() {
+    const rows = window._importObatRows || [];
+    if (rows.length === 0) return;
+
+    const btn = document.getElementById('btnKonfirmasiImport');
+    btn.disabled = true;
+    btn.textContent = `⏳ Mengimport 0/${rows.length}...`;
+
+    let sukses = 0;
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+        btn.textContent = `⏳ Mengimport ${i+1}/${rows.length}...`;
+        try {
+            await sb_saveObat(rows[i]);
+            sukses++;
+        } catch(e) {
+            errors.push(`${rows[i].nama}: ${e.message || 'error'}`);
+        }
+    }
+
+    btn.disabled = false;
+    btn.textContent = '✅ Import Sekarang';
+
+    if (sukses > 0) {
+        showToast(`✅ ${sukses} obat berhasil diimport${errors.length > 0 ? `, ${errors.length} gagal` : ''}`, 'success');
+        closeModalImportObat();
+        await _refreshObatCache();
+        renderDaftarObat();
+    } else {
+        showToast('❌ Semua import gagal. Periksa koneksi & format data.', 'error');
+    }
+    if (errors.length > 0) console.warn('[Import Obat] Errors:', errors);
+}
+
+/** Download template Excel kosong */
+function _downloadTemplateExcel() {
+    if (typeof XLSX === 'undefined') {
+        _loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js').then(_downloadTemplateExcel);
+        return;
+    }
+    const data = [
+        ['nama','kategori','satuan','harga_beli','harga_jual','stok','stok_minimum','frekuensi_default','exp_date','keterangan'],
+        ['Amoxicillin 500mg','Antibiotik','tablet',3000,8000,100,10,'3x1','2026-08','Sesudah makan'],
+        ['Paracetamol 500mg','Analgesik','tablet',500,2000,200,20,'3x1','2026-12',''],
+        ['Antasida Doen','Antasida','tablet',800,3000,150,15,'3x1 AC','2025-11','Sebelum makan'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    // Style header
+    ws['!cols'] = [20,14,10,12,12,8,14,18,12,20].map(w => ({wch:w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Obat');
+    XLSX.writeFile(wb, 'template_import_obat.xlsx');
+}
+
+/** Load script dinamis */
+function _loadScript(src) {
+    return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
+/** Format exp_date YYYY-MM-DD → Agu 2026 */
+function _formatExpDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+}
+
+/** Ringkasan summary — tambah tile exp kadaluarsa */
+function _getExpiredCount() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    return _obatCache.filter(o => o.exp_date && new Date(o.exp_date) < today).length;
 }

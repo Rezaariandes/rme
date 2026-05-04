@@ -242,6 +242,19 @@ let _tagihanTgl     = '';
 
 /** Dipanggil dari kunjungan.js setelah saveAll sukses */
 async function openModalTagihan(kunjunganId, pasienId, pasienNama, tgl, kunjunganData) {
+    // Guard: modul harus aktif
+    if (!window._biayaAktif) return;
+    // Guard: tabel harus ada — cek dulu tanpa crash
+    try {
+        await _sbFetch('tarif_layanan?select=id&limit=1');
+    } catch(e) {
+        const msg = e.message || '';
+        if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('42P01')) {
+            console.warn('[Biaya] Tabel belum ada — skip modal tagihan. Jalankan SETUP_DATABASE.sql');
+            return; // silent skip — jangan ganggu flow rekam medis
+        }
+    }
+
     _tagihanKunjId   = kunjunganId;
     _tagihanPasienId = pasienId;
     _tagihanPasienNama = pasienNama || '—';
@@ -525,19 +538,43 @@ async function simpanDanPrintTagihan() {
 //  LIHAT TAGIHAN DARI RIWAYAT
 // ════════════════════════════════════════
 async function lihatTagihanKunjungan(kunjunganId, pasienNama, tgl) {
+    if (!kunjunganId) {
+        showToast('⚠️ ID kunjungan tidak tersedia', 'error');
+        return;
+    }
+    if (!window._biayaAktif) {
+        showToast('ℹ️ Modul pembiayaan belum diaktifkan di Settings', 'info');
+        return;
+    }
+
+    // Tampilkan loading agar tidak terkesan freeze
+    showToast('⏳ Memuat tagihan...', 'info');
+
     try {
         const tagihan = await sb_getTagihan(kunjunganId);
         if (!tagihan) {
             showToast('ℹ️ Belum ada tagihan untuk kunjungan ini', 'info');
             return;
         }
-        _showInvoiceModal(tagihan, pasienNama, tgl);
+        _showInvoiceModal(tagihan, pasienNama || '—', tgl || '');
     } catch(e) {
-        showToast('❌ Gagal memuat tagihan', 'error');
+        const msg = e.message || '';
+        if (msg.includes('does not exist') || msg.includes('relation')) {
+            showToast('⚠️ Tabel tagihan belum dibuat. Jalankan SETUP_DATABASE.sql di Supabase terlebih dahulu.', 'error');
+        } else {
+            showToast('❌ Gagal memuat tagihan: ' + msg, 'error');
+        }
+        console.error('[lihatTagihanKunjungan]', e);
     }
 }
 
 function _showInvoiceModal(tagihan, pasienNama, tgl) {
+    // Simpan tagihan ke window var — JANGAN pakai JSON.stringify di onclick attribute
+    // karena data besar / karakter kutip akan merusak HTML attribute dan freeze browser
+    window._invoiceData    = tagihan;
+    window._invoiceNama    = pasienNama || '';
+    window._invoiceTgl     = tgl || '';
+
     let modal = document.getElementById('modalInvoiceView');
     if (!modal) {
         modal = document.createElement('div');
@@ -545,11 +582,12 @@ function _showInvoiceModal(tagihan, pasienNama, tgl) {
         modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);overflow-y:auto;padding:12px;';
         document.body.appendChild(modal);
     }
+
     modal.innerHTML = `
     <div style="background:#fff;border-radius:18px;max-width:520px;margin:0 auto;padding:0;box-shadow:0 8px 40px rgba(0,0,0,0.2);overflow:hidden;">
         ${_buildInvoiceHtml(tagihan, pasienNama, tgl, false)}
         <div style="padding:12px 18px 18px;display:flex;gap:8px;">
-            <button onclick="printInvoice(${JSON.stringify(tagihan).replace(/"/g,'&quot;')}, '${escHtml(pasienNama)}', '${tgl}')"
+            <button onclick="_printInvoiceFromWindow()"
                 style="flex:1;padding:11px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">
                 🖨️ Print Invoice
             </button>
@@ -560,6 +598,15 @@ function _showInvoiceModal(tagihan, pasienNama, tgl) {
         </div>
     </div>`;
     modal.style.display = 'block';
+}
+
+/** Ambil data dari window var lalu print — dipanggil dari tombol di _showInvoiceModal */
+function _printInvoiceFromWindow() {
+    const tagihan   = window._invoiceData;
+    const nama      = window._invoiceNama || '';
+    const tgl       = window._invoiceTgl  || '';
+    if (!tagihan) return showToast('⚠️ Data invoice tidak tersedia', 'error');
+    printInvoice(tagihan, nama, tgl);
 }
 
 // ════════════════════════════════════════

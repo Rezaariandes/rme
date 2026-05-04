@@ -26,7 +26,7 @@ async function sb_getObatById(id) {
 async function sb_saveObat(payload) {
     const {
         id, nama, kategori, satuan, harga_beli, harga_jual,
-        stok, stok_minimum, frekuensi_default, keterangan
+        stok, stok_minimum, frekuensi_default, keterangan, exp_date
     } = payload;
 
     const body = {
@@ -38,7 +38,8 @@ async function sb_saveObat(payload) {
         stok:               stok        ? Number(stok)        : 0,
         stok_minimum:       stok_minimum? Number(stok_minimum): 5,
         frekuensi_default:  frekuensi_default || '3x1',
-        keterangan:         keterangan || null
+        keterangan:         keterangan || null,
+        exp_date:           exp_date   || null
     };
 
     if (id) {
@@ -151,3 +152,33 @@ async function sb_getKategoriObat() {
     return unique;
 }
 
+
+// ═══════════════════════════════════════
+//  IMPORT OBAT DARI EXCEL (bulk insert)
+// ═══════════════════════════════════════
+
+/** Import array obat dari hasil parse Excel ke Supabase.
+ *  Setiap item: { nama, kategori, satuan, harga_beli, harga_jual,
+ *                 stok, stok_minimum, frekuensi_default, keterangan, exp_date }
+ *  Return: { sukses, gagal, errors }
+ */
+async function sb_importObat(rows) {
+    let sukses = 0, gagal = 0;
+    const errors = [];
+
+    for (const row of rows) {
+        if (!row.nama || !row.nama.trim()) {
+            gagal++;
+            errors.push('Baris dilewati: nama kosong');
+            continue;
+        }
+        try {
+            await sb_saveObat(row);
+            sukses++;
+        } catch(e) {
+            gagal++;
+            errors.push(`${row.nama}: ${e.message || 'error'}`);
+        }
+    }
+    return { sukses, gagal, errors };
+}
