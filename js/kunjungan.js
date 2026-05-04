@@ -49,16 +49,13 @@ function validasiNilaiVital() {
 // ════════════════════════════════════════════════════════
 //  STATUS PENANDA: OBAT & PEMBAYARAN
 //  Disimpan di Supabase (kolom status_obat, status_bayar di tabel kunjungan)
-//  + fallback cache lokal agar responsif
+//  + cache lokal agar UI responsif
 // ════════════════════════════════════════════════════════
 
-// Cache lokal status agar tidak perlu fetch ulang setiap render
 window._statusCache = window._statusCache || {};
 
 function _getStatusKunjungan(kId) {
-    // Prioritas: cache lokal (dari Supabase atau toggle)
     if (window._statusCache[kId]) return window._statusCache[kId];
-    // Fallback ke kunjunganHariIni jika data sudah ada
     const k = (typeof kunjunganHariIni !== 'undefined' ? kunjunganHariIni : []).find(x => x.id === kId);
     if (k) {
         const s = { obat: !!k.status_obat, bayar: !!k.status_bayar };
@@ -72,29 +69,26 @@ function _setStatusKunjungan(kId, field, value) {
     const s = _getStatusKunjungan(kId);
     s[field] = value;
     window._statusCache[kId] = s;
-    // Update juga di kunjunganHariIni agar render ulang sinkron
     const k = (typeof kunjunganHariIni !== 'undefined' ? kunjunganHariIni : []).find(x => x.id === kId);
     if (k) k[field === 'obat' ? 'status_obat' : 'status_bayar'] = value;
 }
 
-/** Toggle status obat / bayar dari card kunjungan — simpan ke Supabase */
+/** Toggle status obat / bayar — simpan ke Supabase agar persist lintas sesi */
 async function toggleStatusKunjungan(event, kId, field) {
     event.stopPropagation();
     const s   = _getStatusKunjungan(kId);
     const val = !s[field];
     _setStatusKunjungan(kId, field, val);
 
-    // Update tampilan badge langsung tanpa re-render penuh
     const badge = document.getElementById(`badge_${field}_${kId}`);
     if (badge) {
-        badge.innerHTML     = _badgeHtml(field, val);
+        badge.innerHTML  = _badgeHtml(field, val);
         badge.style.cssText = _badgeStyleAttr(field, val);
     }
 
-    const label = field === 'obat' ? 'Obat' : 'Pembayaran';
+    const label = field === 'obat' ? 'Resep' : 'Pembayaran';
     showToast(val ? `✅ ${label} sudah ditandai` : `↩️ ${label} dibatalkan`, val ? 'success' : 'info');
 
-    // Simpan ke Supabase agar persist lintas sesi & logout
     try {
         const col = field === 'obat' ? 'status_obat' : 'status_bayar';
         await _sbFetch(`kunjungan?id=eq.${kId}`, {
@@ -107,7 +101,7 @@ async function toggleStatusKunjungan(event, kId, field) {
     }
 }
 
-/** Helper: render HTML badge status */
+/** Helper: HTML isi badge */
 function _badgeHtml(field, active) {
     if (field === 'obat') {
         return active
@@ -130,17 +124,16 @@ function _badgeStyleAttr(field, active) {
     return base + 'background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;opacity:0.85;';
 }
 
-/** Helper: warna badge (legacy — tidak dipakai, tapi jaga kompatibilitas) */
+/** Legacy compat */
 function _badgeStyle(field, active) {
-    if (active) {
-        return field === 'obat'
-            ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;'
-            : 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;';
-    }
-    return 'background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;';
+    return active
+        ? (field === 'obat' ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;' : 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;')
+        : 'background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;';
 }
 
 // ── AMBIL DATA KUNJUNGAN BERDASARKAN TANGGAL ──
+let _searchKunjungan = '';
+
 async function fetchByDate() {
     const filterEl = $('filterDate');
     if (!filterEl || !filterEl.value) return;
@@ -157,12 +150,10 @@ async function fetchByDate() {
         return;
     }
 
-    // Reset pencarian saat tanggal berubah
+    // Reset pencarian & cache status saat tanggal berubah
     _searchKunjungan = '';
     const searchEl = $('searchKunjungan');
     if (searchEl) searchEl.value = '';
-
-    // Bersihkan cache status agar data fresh dari server
     window._statusCache = {};
 
     const listEl = $('listHariIni');
@@ -179,8 +170,6 @@ async function fetchByDate() {
 }
 
 // ── RENDER DAFTAR KUNJUNGAN HARI INI ──
-let _searchKunjungan = ''; // state pencarian nama
-
 function renderKunjunganHariIni() {
     const container = $('listHariIni');
     const statTotal = $('statTotal');
@@ -201,20 +190,17 @@ function renderKunjunganHariIni() {
     const q = (_searchKunjungan || '').toLowerCase().trim();
     const filtered = q ? sorted.filter(h => (h.nama || '').toLowerCase().includes(q)) : sorted;
 
-    // Tentukan jabatan user yang login
-    const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
+    const jabatan    = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
     const isApoteker = jabatan === 'apoteker';
     const isKasir    = jabatan === 'kasir';
     const isAtlm     = jabatan === 'atlm';
     const isParamedis = window._isParamedis === true;
 
-    // Tentukan siapa yang boleh toggle status (dari settings hak akses atau fallback)
-    // Fallback: Apoteker/Admin/Dokter bisa toggle obat; Kasir/Admin/Dokter bisa toggle bayar
     const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
     const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
 
     if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Tidak ada pasien dengan nama "<strong>${q}</strong>".</div>`;
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Tidak ada pasien "<strong>${q}</strong>".</div>`;
         return;
     }
 
@@ -222,7 +208,6 @@ function renderKunjunganHariIni() {
         const isDone     = h.status === 'Selesai';
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
 
-        // Lab row — tampilkan ke ATLM, Apoteker juga bisa lihat
         const hasLab = h.lab_gds || h.lab_chol || h.lab_ua;
         const labRow = hasLab
             ? `<div style="font-size:10.5px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:3px 7px;border-radius:6px;margin-top:3px;">
@@ -238,65 +223,47 @@ function renderKunjunganHariIni() {
             ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:2px;">👨‍⚕️ dr. ${h.dokterNama}</div>`
             : '';
 
-        // Status penanda obat & bayar — dari Supabase (via _statusCache atau kunjunganHariIni)
+        // Status dari Supabase (via cache)
         const st       = _getStatusKunjungan(h.id);
         const obatDone = st.obat;
         const bayarDone= st.bayar;
 
-        // Tombol aksi cepat — sesuai jabatan
         let actionBtns = '';
-
-        // Tombol Invoice — tampil untuk Kasir, Admin, Dokter (bukan Paramedis & ATLM)
         if (!isParamedis && !isAtlm) {
-            actionBtns += `
-            <button onclick="event.stopPropagation();_quickInvoice('${h.id}','${escHtml(tampilNama)}')"
+            actionBtns += `<button onclick="event.stopPropagation();_quickInvoice('${h.id}','${escHtml(tampilNama)}')"
                 style="flex:1;padding:5px 0;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
-                🧾 Invoice
-            </button>`;
+                🧾 Invoice</button>`;
         }
-
-        // Tombol Resep — tampil untuk Apoteker, Dokter, Admin (tidak untuk Kasir & ATLM)
         if (!isKasir && !isAtlm) {
-            actionBtns += `
-            <button onclick="event.stopPropagation();_quickResep('${h.id}','${escHtml(tampilNama)}')"
+            actionBtns += `<button onclick="event.stopPropagation();_quickResep('${h.id}','${escHtml(tampilNama)}')"
                 style="flex:1;padding:5px 0;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
-                💊 Resep
-            </button>`;
+                💊 Resep</button>`;
         }
 
-        const badgeObat = `
-        <span id="badge_obat_${h.id}"
+        const badgeObat = `<span id="badge_obat_${h.id}"
             onclick="${canToggleObat ? `toggleStatusKunjungan(event,'${h.id}','obat')` : 'event.stopPropagation()'}"
             style="${_badgeStyleAttr('obat', obatDone)}${canToggleObat ? '' : 'cursor:default;'}">
-            ${_badgeHtml('obat', obatDone)}
-        </span>`;
+            ${_badgeHtml('obat', obatDone)}</span>`;
 
-        const badgeBayar = `
-        <span id="badge_bayar_${h.id}"
+        const badgeBayar = `<span id="badge_bayar_${h.id}"
             onclick="${canToggleBayar ? `toggleStatusKunjungan(event,'${h.id}','bayar')` : 'event.stopPropagation()'}"
             style="${_badgeStyleAttr('bayar', bayarDone)}${canToggleBayar ? '' : 'cursor:default;'}">
-            ${_badgeHtml('bayar', bayarDone)}
-        </span>`;
+            ${_badgeHtml('bayar', bayarDone)}</span>`;
 
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.72' : '1'};flex-direction:column;gap:0;padding:10px 12px;" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div style="display:flex;align-items:flex-start;gap:10px;width:100%;">
                 <div class="visit-time-badge" style="flex-shrink:0;">${h.waktu || '-'}</div>
                 <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tampilNama}</div>
-                    <div style="font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">Keluhan: ${h.keluhan || '-'}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C | N: ${h.nadi || '-'}</div>
-                    ${labRow}
-                    ${diagRow}
-                    ${dokterRow}
+                    <div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tampilNama}</div>
+                    <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">Keluhan: ${h.keluhan || '-'}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C | N: ${h.nadi || '-'}</div>
+                    ${labRow}${diagRow}${dokterRow}
                 </div>
                 <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}" style="flex-shrink:0;">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
             </div>
-
-            <!-- Baris status penanda + tombol aksi -->
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--border);" onclick="event.stopPropagation()">
-                ${badgeObat}
-                ${badgeBayar}
+                ${badgeObat}${badgeBayar}
                 <div style="flex:1;"></div>
                 ${actionBtns}
             </div>
@@ -402,32 +369,52 @@ async function bukaRekamMedisHariIni(kId) {
     try {
         let riwayatRows = [];
         if (currentPasienId) {
+            // FIX: Hapus join dokter(nama_dokter) — tabel kunjungan tidak punya FK ke dokter.
+            // Nama dokter di-resolve dari window._usersCache via user_id (sama seperti sb_initData).
             riwayatRows = await _sbFetch(
-                `kunjungan?pasien_id=eq.${currentPasienId}&order=tgl.desc,waktu.desc&select=*,dokter(nama_dokter)`
+                `kunjungan?pasien_id=eq.${currentPasienId}&order=tgl.desc,waktu.desc&select=*`
             );
         }
-        currentRiwayat = riwayatRows.map(r => ({
-            id:           r.id,
-            tgl:          r.tgl,
-            waktu:        r.waktu,
-            td:           r.td,
-            nadi:         r.nadi,
-            suhu:         r.suhu,
-            rr:           r.rr,
-            bb:           r.bb,
-            tb:           r.tb,
-            keluhan:      r.keluhan,
-            fisik:        r.fisik,
-            lab_gds:      r.lab_gds,
-            lab_chol:     r.lab_chol,
-            lab_ua:       r.lab_ua,
-            diag:         r.diag,
-            terapi:       r.terapi,
-            status:       r.status,
-            user_id:      r.user_id,
-            dokter_id:    r.dokter_id,
-            dokterNama:   r.dokter?.nama_dokter || ''
-        }));
+
+        // Pastikan users cache tersedia untuk resolve nama dokter
+        if (!window._usersCache || window._usersCache.length === 0) {
+            try {
+                const users = await _sbFetch('users?select=id,nama,jabatan&order=nama.asc');
+                window._usersCache = users || [];
+            } catch(e) { window._usersCache = []; }
+        }
+
+        currentRiwayat = riwayatRows.map(r => {
+            // Resolve nama dokter dari cache users berdasarkan user_id
+            const dokterUser = r.user_id
+                ? (window._usersCache || []).find(u => u.id === r.user_id && u.jabatan?.toLowerCase() === 'dokter')
+                : null;
+            return {
+                id:        r.id,
+                tgl:       r.tgl,
+                waktu:     r.waktu,
+                td:        r.td,
+                nadi:      r.nadi,
+                suhu:      r.suhu,
+                rr:        r.rr,
+                bb:        r.bb,
+                tb:        r.tb,
+                keluhan:   r.keluhan,
+                fisik:     r.fisik,
+                lab_gds:   r.lab_gds,
+                lab_chol:  r.lab_chol,
+                lab_ua:    r.lab_ua,
+                diag:      r.diagnosa,   // FIX: kolom di DB adalah 'diagnosa', bukan 'diag'
+                diagnosa2: r.diagnosa2,
+                terapi:    r.terapi,
+                surat_sakit: r.surat_sakit,
+                status:    r.status,
+                user_id:   r.user_id,
+                status_obat:  !!r.status_obat,
+                status_bayar: !!r.status_bayar,
+                dokterNama: dokterUser ? dokterUser.nama : ''
+            };
+        });
         localStorage.setItem('cP_riwayat', JSON.stringify(currentRiwayat));
         if (typeof renderRiwayatList === 'function') renderRiwayatList(currentRiwayat, 'historyListMedis');
     } catch(e) {
