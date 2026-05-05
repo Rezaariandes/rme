@@ -298,7 +298,7 @@ function _quickInvoice(kId, namaPasien) {
     }
 }
 
-/** Tampilkan resep dari kunjungan secara ringkas */
+/** Tampilkan resep dari kunjungan dalam modal profesional */
 async function _quickResep(kId, namaPasien) {
     try {
         const items = await sb_getResepByKunjungan(kId);
@@ -306,10 +306,10 @@ async function _quickResep(kId, namaPasien) {
             showToast(`ℹ️ Belum ada resep untuk ${namaPasien}`, 'info');
             return;
         }
-        const resepText = items.map((r, i) =>
-            `${i+1}. ${r.nama_obat} — ${r.jumlah} ${r.obat?.satuan || 'tablet'} (${r.frekuensi || ''})`
-        ).join('\n');
-        alert(`💊 Resep — ${namaPasien}\n\n${resepText}\n\nTotal item: ${items.length}`);
+        // Cari data kunjungan untuk tanggal
+        const kunjData = kunjunganHariIni.find(x => x.id === kId);
+        const tgl = kunjData ? (kunjData.tgl || ($('filterDate') ? $('filterDate').value : '')) : '';
+        _tampilModalResep(kId, namaPasien, items, tgl);
     } catch(e) {
         showToast("❌ Gagal memuat resep: " + (e.message || ''), "error");
     }
@@ -652,20 +652,173 @@ function _bukaInvoiceRiwayat(btn) {
 /** Helper: buka resep dari tombol di riwayat list */
 async function _bukaResepRiwayat(btn) {
     const kunjId = btn.getAttribute('data-kunjid');
-    const nama   = btn.getAttribute('data-nama') || '';
+    const tgl    = btn.getAttribute('data-tgl') || '';
+    // Cari nama pasien dari currentRiwayat atau allPatients
+    let nama = btn.getAttribute('data-nama') || '';
+    if (!nama && typeof currentPasienId !== 'undefined' && currentPasienId) {
+        const p = (typeof allPatients !== 'undefined' ? allPatients : []).find(x => x.id === currentPasienId);
+        if (p) nama = p.nama || '';
+    }
     try {
         const items = await sb_getResepByKunjungan(kunjId);
         if (!items || items.length === 0) {
             showToast('ℹ️ Tidak ada resep pada kunjungan ini', 'info');
             return;
         }
-        const resepText = items.map((r, i) =>
-            `${i+1}. ${r.nama_obat} — ${r.jumlah} ${r.obat?.satuan || 'tablet'} (${r.frekuensi || ''})`
-        ).join('\n');
-        alert(`💊 Resep — ${nama}\n\n${resepText}`);
+        _tampilModalResep(kunjId, nama, items, tgl);
     } catch(e) {
         showToast("❌ Gagal memuat resep", "error");
     }
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL RESEP PROFESIONAL
+// ════════════════════════════════════════════════════════
+
+function _tampilModalResep(kunjId, namaPasien, items, tgl) {
+    // Hapus modal lama jika ada
+    const old = document.getElementById('modalResepPro');
+    if (old) old.remove();
+
+    // Ambil info klinik & dokter dari window globals
+    const klinikNama   = window.KLINIK_NAMA  || 'Klinik';
+    const klinikAlamat = (window._settingsFull && window._settingsFull.klinik_alamat) || '';
+    const klinikTelp   = (window._settingsFull && window._settingsFull.klinik_telp)   || '';
+
+    // Cari dokter dari kunjungan (ambil dari cache atau _dokterAktif)
+    let dokterNama = '';
+    const kunjData = (typeof kunjunganHariIni !== 'undefined' ? kunjunganHariIni : []).find(x => x.id === kunjId);
+    if (kunjData && kunjData.dokterNama) {
+        dokterNama = kunjData.dokterNama;
+    } else if (window._dokterAktif && window._dokterAktif.length > 0) {
+        dokterNama = window._dokterAktif[0].nama || '';
+    }
+
+    // Format tanggal
+    const tglFmt = tgl ? (typeof formatTglIndo === 'function' ? formatTglIndo(tgl) : tgl) : new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Baris item resep
+    const itemsHtml = items.map((r, i) => {
+        const satuan   = r.obat?.satuan || 'tablet';
+        const frek     = r.frekuensi || '';
+        const catatan  = r.catatan   || '';
+        return `
+        <tr style="border-bottom:1px dashed #e2e8f0;">
+            <td style="padding:9px 6px;font-weight:700;color:#1e293b;vertical-align:top;width:24px;">
+                ${i + 1}.
+            </td>
+            <td style="padding:9px 6px;vertical-align:top;">
+                <div style="font-weight:700;font-size:13px;color:#1e293b;">${escHtml(r.nama_obat)}</div>
+                ${catatan ? `<div style="font-size:10.5px;color:#64748b;margin-top:2px;font-style:italic;">${escHtml(catatan)}</div>` : ''}
+            </td>
+            <td style="padding:9px 6px;text-align:center;vertical-align:top;white-space:nowrap;">
+                <div style="font-size:13px;font-weight:700;color:#2563eb;">${r.jumlah} ${escHtml(satuan)}</div>
+            </td>
+            <td style="padding:9px 6px;text-align:center;vertical-align:top;white-space:nowrap;">
+                <div style="font-size:12px;font-weight:600;color:#059669;background:#ecfdf5;border-radius:6px;padding:2px 8px;display:inline-block;">${escHtml(frek)}</div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Konten yang akan dicetak
+    const printContent = `
+        <div style="text-align:center;border-bottom:2px solid #2563eb;padding-bottom:10px;margin-bottom:14px;">
+            <div style="font-size:18px;font-weight:800;color:#1e3a8a;letter-spacing:-0.5px;">${escHtml(klinikNama)}</div>
+            ${klinikAlamat ? `<div style="font-size:11px;color:#64748b;margin-top:2px;">${escHtml(klinikAlamat)}</div>` : ''}
+            ${klinikTelp   ? `<div style="font-size:11px;color:#64748b;">Telp: ${escHtml(klinikTelp)}</div>` : ''}
+        </div>
+        <div style="text-align:center;margin-bottom:14px;">
+            <div style="display:inline-block;background:#2563eb;color:#fff;font-size:12px;font-weight:800;padding:3px 20px;border-radius:20px;letter-spacing:1px;">R E S E P</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:12px;gap:10px;">
+            <div>
+                <span style="color:#64748b;">Pasien:</span>
+                <strong style="color:#1e293b;"> ${escHtml(namaPasien)}</strong>
+            </div>
+            <div style="text-align:right;">
+                <span style="color:#64748b;">Tanggal:</span>
+                <strong style="color:#1e293b;"> ${tglFmt}</strong>
+            </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+            <thead>
+                <tr style="background:#eff6ff;border-bottom:2px solid #bfdbfe;">
+                    <th style="padding:7px 6px;font-size:10px;color:#1e40af;text-align:left;font-weight:800;text-transform:uppercase;letter-spacing:.5px;" colspan="2">Nama Obat</th>
+                    <th style="padding:7px 6px;font-size:10px;color:#1e40af;text-align:center;font-weight:800;text-transform:uppercase;letter-spacing:.5px;">Jumlah</th>
+                    <th style="padding:7px 6px;font-size:10px;color:#1e40af;text-align:center;font-weight:800;text-transform:uppercase;letter-spacing:.5px;">Frekuensi</th>
+                </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+        </table>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;">
+            <div style="font-size:10.5px;color:#94a3b8;font-style:italic;">*Harap hubungi dokter jika ada reaksi tidak diinginkan</div>
+            <div style="text-align:center;min-width:110px;">
+                <div style="font-size:11px;color:#64748b;margin-bottom:36px;">Dokter Pemeriksa,</div>
+                <div style="border-top:1px solid #94a3b8;padding-top:4px;font-size:11.5px;font-weight:700;color:#1e293b;">${escHtml(dokterNama || '_______________')}</div>
+            </div>
+        </div>`;
+
+    // Bangun modal
+    const modal = document.createElement('div');
+    modal.id = 'modalResepPro';
+    modal.style.cssText = `
+        position:fixed;inset:0;z-index:10000;
+        background:rgba(15,23,42,0.55);
+        display:flex;align-items:flex-end;justify-content:center;
+        padding:0;animation:_fadeInModal .2s ease;`;
+
+    modal.innerHTML = `
+    <style>
+        @keyframes _fadeInModal { from{opacity:0} to{opacity:1} }
+        @keyframes _slideUpModal { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @media print {
+            body > *:not(#modalResepPro) { display:none !important; }
+            #modalResepPro { position:static!important;background:none!important;padding:0!important; }
+            #resepProShell { box-shadow:none!important;border-radius:0!important;max-height:none!important;overflow:visible!important;width:100%!important; }
+            #resepProActions { display:none!important; }
+        }
+    </style>
+    <div id="resepProShell" style="
+        background:#fff;width:100%;max-width:480px;
+        border-radius:20px 20px 0 0;
+        box-shadow:0 -8px 40px rgba(0,0,0,0.18);
+        max-height:90vh;display:flex;flex-direction:column;
+        animation:_slideUpModal .25s cubic-bezier(.34,1.56,.64,1);">
+
+        <!-- Handle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
+            <div style="font-size:14px;font-weight:800;color:#1e293b;">💊 Resep Obat</div>
+            <button onclick="document.getElementById('modalResepPro').remove()"
+                style="background:rgba(100,116,139,0.1);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">✕</button>
+        </div>
+        <div style="width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:8px auto 0;"></div>
+
+        <!-- Body resep (scrollable) -->
+        <div style="overflow-y:auto;padding:16px 16px 0;flex:1;">
+            <div id="resepProContent" style="font-family:'Sora',sans-serif;font-size:12px;color:#1e293b;">
+                ${printContent}
+            </div>
+        </div>
+
+        <!-- Tombol aksi -->
+        <div id="resepProActions" style="padding:12px 16px 20px;display:flex;gap:8px;border-top:1px solid #f1f5f9;flex-shrink:0;">
+            <button onclick="window.print()"
+                style="flex:1;padding:11px 0;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                🖨️ Cetak Resep
+            </button>
+            <button onclick="document.getElementById('modalResepPro').remove()"
+                style="padding:11px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;">
+                Tutup
+            </button>
+        </div>
+    </div>`;
+
+    // Tutup modal saat klik backdrop
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.remove();
+    });
+
+    document.body.appendChild(modal);
 }
 
 // ════════════════════════════════════════════════════════
