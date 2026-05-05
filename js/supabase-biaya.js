@@ -143,26 +143,18 @@ async function sb_autoTagihanFromKunjungan(kunjunganId, kunjunganData) {
         if (harga > 0) items.push({ nama_item: nama, kategori, jumlah, harga_satuan: harga, keterangan: ket });
     };
 
-    // 1. Tarif pemeriksaan vital sign
+    // 1. Tarif pemeriksaan vital sign — cek field dari DB (td,nadi,suhu) dan payload saveAll
     const hasTtv = kunjunganData.td || kunjunganData.nadi || kunjunganData.suhu;
     if (hasTtv) {
         const t = tarif.find(x => x.kategori === 'Pemeriksaan' && x.nama === 'Vital Sign');
         if (t) addItem('Pemeriksaan Vital Sign', 'Pemeriksaan', t.harga);
     }
 
-    // 2. Tarif konsultasi medis — BUG-2 FIX: cek key 'diagnosa' DAN 'diag'
-    // saveAll() mengirim key 'diagnosa'; data riwayat memakai key 'diag'
-    const hasDiag = kunjunganData.diagnosa || kunjunganData.diag;
+    // 2. Tarif pemeriksaan medis (konsultasi dokter)
+    const hasDiag = kunjunganData.diag;
     if (hasDiag) {
         const t = tarif.find(x => x.kategori === 'Pemeriksaan' && x.nama === 'Konsultasi Medis');
         if (t) addItem('Konsultasi Medis', 'Pemeriksaan', t.harga);
-    }
-
-    // 3. Tarif pemeriksaan fisik — BUG-2 FIX: sebelumnya tidak pernah dicek
-    const hasFisik = kunjunganData.fisik && String(kunjunganData.fisik).trim() !== '';
-    if (hasFisik) {
-        const t = tarif.find(x => x.kategori === 'Pemeriksaan' && x.nama === 'Pemeriksaan Fisik');
-        if (t) addItem('Pemeriksaan Fisik', 'Pemeriksaan', t.harga);
     }
 
     // 3. Tarif lab per item
@@ -205,8 +197,8 @@ async function sb_autoTagihanFromKunjungan(kunjunganId, kunjunganData) {
         } catch(e) {}
     }
 
-    // 5. Surat keterangan
-    if (kunjunganData.surat_sakit === 'YA') {
+    // 5. Surat keterangan — cek kedua format key (snake_case dari DB, camelCase dari saveAll payload)
+    if (kunjunganData.surat_sakit === 'YA' || kunjunganData.suratSakit === 'YA') {
         const t = tarif.find(x => x.kategori === 'Administrasi' && x.nama === 'Surat Keterangan Sakit');
         if (t) addItem('Surat Keterangan Sakit', 'Administrasi', t.harga);
     }

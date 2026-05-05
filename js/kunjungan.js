@@ -190,94 +190,106 @@ function renderKunjunganHariIni() {
     const q = (_searchKunjungan || '').toLowerCase().trim();
     const filtered = q ? sorted.filter(h => (h.nama || '').toLowerCase().includes(q)) : sorted;
 
-    const jabatan    = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
-    const isApoteker = jabatan === 'apoteker';
-    const isKasir    = jabatan === 'kasir';
-    const isAtlm     = jabatan === 'atlm';
-    const isParamedis = window._isParamedis === true;
-
-    const canToggleObat  = ['apoteker','admin','dokter'].includes(jabatan);
-    const canToggleBayar = ['kasir','admin','dokter'].includes(jabatan);
-
-    if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div>Tidak ada pasien "<strong>${q}</strong>".</div>`;
-        return;
-    }
+    const access     = window._currentAccess || [];
+    const has        = id => access.length === 0 || access.includes(id); // fallback: tampilkan semua jika access kosong
 
     container.innerHTML = filtered.map(h => {
         const isDone     = h.status === 'Selesai';
         const tampilNama = h.nama || (allPatients.find(x => x.id === h.pasienId) || {}).nama || '(Nama tidak diketahui)';
 
+        // ── TTV ringkas
+        const ttvRow = has('mod_kunjungan_ttv')
+            ? `<div style="font-size:11px;color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C | N: ${h.nadi || '-'}</div>`
+            : '';
+
+        // ── Keluhan
+        const keluhanRow = has('mod_kunjungan_keluhan')
+            ? `<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">Keluhan: ${h.keluhan || '-'}</div>`
+            : '';
+
+        // ── Lab ringkas
         const hasLab = h.lab_gds || h.lab_chol || h.lab_ua;
-        const labRow = hasLab
+        const labRow = (has('mod_kunjungan_lab') && hasLab)
             ? `<div style="font-size:10.5px;color:#7c3aed;background:rgba(124,58,237,0.07);padding:3px 7px;border-radius:6px;margin-top:3px;">
                  🔬 GDS: ${h.lab_gds||'—'} | Kol: ${h.lab_chol||'—'} | AU: ${h.lab_ua||'—'}
                </div>`
             : '';
 
-        const diagRow = (isParamedis || isApoteker || isKasir || isAtlm)
-            ? ''
-            : `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`;
+        // ── Diagnosa
+        const diagRow = has('mod_kunjungan_diagnosa')
+            ? `<div style="font-size:11px;color:var(--text-muted);">Diagnosa: ${h.diag || '-'}</div>`
+            : '';
 
-        const dokterRow = h.dokterNama
+        // ── Dokter pemeriksa
+        const dokterRow = (has('mod_kunjungan_dokter') && h.dokterNama)
             ? `<div style="font-size:10px;color:#059669;font-weight:600;margin-top:2px;">👨‍⚕️ dr. ${h.dokterNama}</div>`
             : '';
 
-        // Status dari Supabase (via cache)
-        const st       = _getStatusKunjungan(h.id);
-        const obatDone = st.obat;
-        const bayarDone= st.bayar;
+        // ── Status badges
+        const st        = _getStatusKunjungan(h.id);
+        const obatDone  = st.obat;
+        const bayarDone = st.bayar;
 
+        const jabatan        = ((typeof loggedInUser !== 'undefined' && loggedInUser) ? (loggedInUser.jabatan || '') : '').toLowerCase();
+        const canToggleObat  = has('mod_kunjungan_status_obat')  && ['apoteker','admin','dokter'].includes(jabatan);
+        const canToggleBayar = has('mod_kunjungan_status_bayar') && ['kasir','admin','dokter'].includes(jabatan);
+
+        const badgeObat  = has('mod_kunjungan_status_obat')
+            ? `<span id="badge_obat_${h.id}"
+                onclick="${canToggleObat ? `toggleStatusKunjungan(event,'${h.id}','obat')` : 'event.stopPropagation()'}"
+                style="${_badgeStyleAttr('obat', obatDone)}${canToggleObat ? '' : 'cursor:default;'}">
+                ${_badgeHtml('obat', obatDone)}</span>`
+            : '';
+
+        const badgeBayar = has('mod_kunjungan_status_bayar')
+            ? `<span id="badge_bayar_${h.id}"
+                onclick="${canToggleBayar ? `toggleStatusKunjungan(event,'${h.id}','bayar')` : 'event.stopPropagation()'}"
+                style="${_badgeStyleAttr('bayar', bayarDone)}${canToggleBayar ? '' : 'cursor:default;'}">
+                ${_badgeHtml('bayar', bayarDone)}</span>`
+            : '';
+
+        // ── Action buttons
         let actionBtns = '';
-        if (!isParamedis && !isAtlm) {
+        if (has('mod_kunjungan_btn_invoice') && window._biayaAktif) {
             actionBtns += `<button onclick="event.stopPropagation();_quickInvoice('${h.id}','${escHtml(tampilNama)}')"
                 style="flex:1;padding:5px 0;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
                 🧾 Invoice</button>`;
         }
-        if (!isKasir && !isAtlm) {
+        if (has('mod_kunjungan_btn_resep') && window._stokAktif) {
             actionBtns += `<button onclick="event.stopPropagation();_quickResep('${h.id}','${escHtml(tampilNama)}')"
                 style="flex:1;padding:5px 0;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;border:none;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
                 💊 Resep</button>`;
         }
 
-        const badgeObat = `<span id="badge_obat_${h.id}"
-            onclick="${canToggleObat ? `toggleStatusKunjungan(event,'${h.id}','obat')` : 'event.stopPropagation()'}"
-            style="${_badgeStyleAttr('obat', obatDone)}${canToggleObat ? '' : 'cursor:default;'}">
-            ${_badgeHtml('obat', obatDone)}</span>`;
+        // ── Status kunjungan badge (menunggu/selesai)
+        const statusBadge = has('mod_kunjungan_status_kunjungan')
+            ? `<div class="status-badge ${isDone ? 'status-done' : 'status-wait'}" style="flex-shrink:0;">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>`
+            : '';
 
-        const badgeBayar = `<span id="badge_bayar_${h.id}"
-            onclick="${canToggleBayar ? `toggleStatusKunjungan(event,'${h.id}','bayar')` : 'event.stopPropagation()'}"
-            style="${_badgeStyleAttr('bayar', bayarDone)}${canToggleBayar ? '' : 'cursor:default;'}">
-            ${_badgeHtml('bayar', bayarDone)}</span>`;
+        const hasActionRow = badgeObat || badgeBayar || actionBtns;
 
         return `
         <div class="visit-card" style="opacity:${isDone ? '0.72' : '1'};flex-direction:column;gap:0;padding:10px 12px;" onclick="bukaRekamMedisHariIni('${h.id}')">
             <div style="display:flex;align-items:flex-start;gap:10px;width:100%;">
                 <div class="visit-time-badge" style="flex-shrink:0;">${h.waktu || '-'}</div>
                 <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tampilNama}</div>
-                    <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">Keluhan: ${h.keluhan || '-'}</div>
-                    <div style="font-size:11px;color:var(--text-muted);">TTV: ${h.td || '-'} mmHg | ${h.suhu || '-'}°C | N: ${h.nadi || '-'}</div>
-                    ${labRow}${diagRow}${dokterRow}
+                    ${has('mod_kunjungan_identitas') ? `<div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tampilNama}</div>` : ''}
+                    ${keluhanRow}${ttvRow}${labRow}${diagRow}${dokterRow}
                 </div>
-                <div class="status-badge ${isDone ? 'status-done' : 'status-wait'}" style="flex-shrink:0;">${isDone ? '✅ Selesai' : '⏳ Menunggu'}</div>
+                ${statusBadge}
             </div>
+            ${hasActionRow ? `
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--border);" onclick="event.stopPropagation()">
                 ${badgeObat}${badgeBayar}
                 <div style="flex:1;"></div>
                 ${actionBtns}
-            </div>
+            </div>` : ''}
         </div>`;
     }).join('');
 }
 
 /** Buka invoice langsung dari card kunjungan */
 function _quickInvoice(kId, namaPasien) {
-    // BUG-4 FIX: Cek modul biaya aktif, beri pesan jelas jika tidak
-    if (!window._biayaAktif) {
-        showToast('ℹ️ Modul pembiayaan belum diaktifkan di ⚙️ Settings', 'info');
-        return;
-    }
     const tgl = $('filterDate') ? $('filterDate').value : '';
     if (typeof lihatTagihanKunjungan === 'function') {
         lihatTagihanKunjungan(kId, namaPasien, tgl);
@@ -493,8 +505,8 @@ function renderRiwayatList(list, containerId) {
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <div style="font-size:10px; color:var(--primary); font-weight:700;">Lihat Detail 👁️</div>
-                            ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" data-nama="${escHtml(_getNamaPasienUntukRiwayat())}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
-                            ${r.id ? `<button onclick="event.stopPropagation();_bukaResepRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-nama="${escHtml(_getNamaPasienUntukRiwayat())}" style="padding:2px 7px;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">💊 Resep</button>` : ''}
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaInvoiceRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-tgl="${escHtml(r.tgl||'')}" style="padding:2px 7px;background:rgba(22,163,74,0.1);color:#166534;border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">🧾 Invoice</button>` : ''}
+                            ${r.id ? `<button onclick="event.stopPropagation();_bukaResepRiwayat(this)" data-kunjid="${escHtml(String(r.id))}" data-nama="${escHtml(r.namaPasien||'')}" style="padding:2px 7px;background:rgba(37,99,235,0.1);color:#1e40af;border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:9.5px;font-weight:700;cursor:pointer;">💊 Resep</button>` : ''}
                         </div>
                     </div>
                     <div style="font-size:11px; margin-bottom:6px; color:var(--text-muted); background:var(--surface-2); padding:4px 8px; border-radius:8px;">
@@ -625,38 +637,15 @@ function _renderSectionLabDinamic() {
     checkLabAlert();
 }
 
-// ── Helper: ambil nama pasien untuk tombol Invoice/Resep di riwayat list ──
-// BUG-4 FIX: Sebelumnya r.namaPasien selalu kosong karena field tidak ada di objek riwayat
-function _getNamaPasienUntukRiwayat() {
-    if (typeof allPatients !== 'undefined' && currentPasienId) {
-        const p = allPatients.find(x => x.id === currentPasienId);
-        if (p && p.nama) return p.nama;
-    }
-    // Fallback ke info banner di halaman medis
-    const bannerEl = document.getElementById('infoPasienNama');
-    return (bannerEl && bannerEl.innerText !== '—') ? bannerEl.innerText : '';
-}
-
 // ── Helper: buka invoice dari tombol di riwayat list ──
 function _bukaInvoiceRiwayat(btn) {
     const kunjId = btn.getAttribute('data-kunjid');
     const tgl    = btn.getAttribute('data-tgl');
-    // BUG-4 FIX: Cari nama dari data-nama jika ada, fallback ke allPatients via currentPasienId
-    let nama = btn.getAttribute('data-nama') || '';
-    if (!nama && typeof allPatients !== 'undefined' && currentPasienId) {
-        nama = (allPatients.find(p => p.id === currentPasienId)?.nama || '');
-    }
-    if (!nama) {
-        // Coba cari dari kunjunganHariIni
-        const k = (typeof kunjunganHariIni !== 'undefined')
-            ? kunjunganHariIni.find(x => x.id === kunjId)
-            : null;
-        if (k) nama = k.nama || '';
-    }
+    const nama   = (typeof allPatients !== 'undefined' && currentPasienId)
+        ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
+        : '';
     if (typeof lihatTagihanKunjungan === 'function') {
         lihatTagihanKunjungan(kunjId, nama, tgl);
-    } else {
-        showToast('⚠️ Modul biaya belum dimuat', 'warning');
     }
 }
 
@@ -815,8 +804,8 @@ async function saveAll() {
 
         showToast('✅ Rekam medis berhasil disimpan!', 'success');
 
-        // Buka modal tagihan otomatis jika modul biaya aktif DAN diagnosa sudah diisi (BUG-3 FIX)
-        if (window._biayaAktif && currentKunjunganId && diag1 && typeof openModalTagihan === 'function') {
+        // Buka modal tagihan otomatis jika modul biaya aktif
+        if (window._biayaAktif && currentKunjunganId && typeof openModalTagihan === 'function') {
             try {
                 const namaPasienDisplay = $('infoPasienNama') ? $('infoPasienNama').innerText : namaPasien;
                 await openModalTagihan(currentKunjunganId, currentPasienId, namaPasienDisplay, localDate, payload);

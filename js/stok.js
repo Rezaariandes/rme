@@ -8,6 +8,25 @@ let _obatCache    = [];   // semua obat dari server
 let _resepItems   = [];   // item resep aktif (kunjungan sedang berjalan)
 let _stokAktif    = false; // diambil dari konfigurasi
 
+// BUG-C FIX: _getResepItems dipanggil di saveAll (index.html patch) tapi tidak pernah
+// didefinisikan. Letakkan di sini karena _resepItems didefinisikan di file ini.
+function _getResepItems() {
+    return _resepItems;
+}
+
+// BUG-C FIX: canAccessMedis dipanggil di pasien.js & kunjungan.js tapi tidak pernah
+// didefinisikan di file manapun. Jabatan Kasir & ATLM tidak boleh akses pageMedis.
+function canAccessMedis() {
+    const jabatan = ((typeof loggedInUser !== 'undefined' && loggedInUser)
+        ? (loggedInUser.jabatan || '') : '').toLowerCase();
+    if (['kasir', 'atlm'].includes(jabatan)) {
+        if (typeof showToast === 'function')
+            showToast('⛔ Jabatan Anda tidak memiliki akses ke halaman pemeriksaan', 'error');
+        return false;
+    }
+    return true;
+}
+
 // ════════════════════════════════════════
 //  INIT — dipanggil dari app.js saat load
 // ════════════════════════════════════════
@@ -321,12 +340,12 @@ function renderSectionResep(kunjunganId) {
     </div>
 
     ${_resepItems.length > 0 ? `
-    <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 12px;font-size:12px;">
+    <div id="resepTotalBox" style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 12px;font-size:12px;">
         <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--primary-dark);">
             <span>Total Biaya Obat:</span>
             <span>Rp ${_fmt(_resepItems.reduce((s, i) => s + (Number(i.jumlah) * Number(i.harga_satuan)), 0))}</span>
         </div>
-    </div>` : ''}
+    </div>` : '<div id="resepTotalBox" style="display:none;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 12px;font-size:12px;"><div style="display:flex;justify-content:space-between;font-weight:700;color:var(--primary-dark);"><span>Total Biaya Obat:</span><span></span></div></div>'}
     `;
 }
 
@@ -393,14 +412,17 @@ function _rerenderResepList() {
     } else {
         el.innerHTML = _resepItems.map((item, idx) => _htmlResepItem(item, idx)).join('');
     }
-    // Update total
-    const totalEl = el.nextElementSibling;
-    if (totalEl && _resepItems.length > 0) {
-        const total = _resepItems.reduce((s, i) => s + (Number(i.jumlah) * Number(i.harga_satuan)), 0);
-        totalEl.style.display = '';
-        totalEl.querySelector('span:last-child').textContent = 'Rp ' + _fmt(total);
-    } else if (totalEl) {
-        totalEl.style.display = 'none';
+    // BUG-F FIX: Pakai getElementById bukan nextElementSibling yang rapuh
+    const totalEl = document.getElementById('resepTotalBox');
+    if (totalEl) {
+        if (_resepItems.length > 0) {
+            const total = _resepItems.reduce((s, i) => s + (Number(i.jumlah) * Number(i.harga_satuan)), 0);
+            totalEl.style.display = '';
+            const spanTotal = totalEl.querySelector('span:last-child');
+            if (spanTotal) spanTotal.textContent = 'Rp ' + _fmt(total);
+        } else {
+            totalEl.style.display = 'none';
+        }
     }
 }
 

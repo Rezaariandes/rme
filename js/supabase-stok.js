@@ -113,17 +113,41 @@ async function sb_getResepByKunjungan(kunjunganId) {
 
 /** Simpan seluruh resep untuk satu kunjungan (replace semua) */
 async function sb_saveResep(kunjunganId, items) {
-    // Hapus resep lama untuk kunjungan ini
+    // BUG-B FIX: Baca resep lama dulu sebelum dihapus, agar bisa hitung selisih stok.
+    // Sebelumnya: setiap simpan selalu kurangi stok penuh → stok berkurang ganda saat edit.
+    let resepLama = [];
+    try {
+        resepLama = await _sbFetch(
+            `resep_item?kunjungan_id=eq.${kunjunganId}&select=obat_id,jumlah`
+        );
+    } catch(e) { resepLama = []; }
+
+    // Hapus resep lama
     await _sbFetch(`resep_item?kunjungan_id=eq.${kunjunganId}`, {
         method: 'DELETE', prefer: 'return=minimal'
     });
 
-    if (!items || items.length === 0) return { status: 'success' };
+    if (!items || items.length === 0) {
+        // Kalau resep dikosongkan, kembalikan stok lama
+        for (const lama of resepLama) {
+            if (lama.obat_id && lama.jumlah) {
+                const obat = await sb_getObatById(lama.obat_id).catch(() => null);
+                if (obat) {
+                    await _sbFetch(`obat?id=eq.${lama.obat_id}`, {
+                        method: 'PATCH',
+                        body: { stok: (obat.stok || 0) + Number(lama.jumlah) },
+                        prefer: 'return=minimal'
+                    }).catch(() => {});
+                }
+            }
+        }
+        return { status: 'success' };
+    }
 
     const rows = items.map(item => ({
         kunjungan_id:  kunjunganId,
         obat_id:       item.obat_id,
-        nama_obat:     item.nama_obat,   // snapshot nama saat resep dibuat
+        nama_obat:     item.nama_obat,
         jumlah:        Number(item.jumlah) || 1,
         frekuensi:     item.frekuensi || '3x1',
         catatan:       item.catatan || null,
@@ -135,10 +159,47 @@ async function sb_saveResep(kunjunganId, items) {
         method: 'POST', body: rows, prefer: 'return=minimal'
     });
 
-    // Kurangi stok untuk setiap item
+    // BUG-B FIX: Hitung selisih jumlah per obat antara resep lama dan baru.
+    // Hanya kurangi stok jika jumlah baru > jumlah lama (tambahan), atau
+    // kembalikan stok jika jumlah baru < jumlah lama (pengurangan).
+    const lamaMap = {};
+    resepLama.forEach(r => {
+        if (r.obat_id) lamaMap[r.obat_id] = (lamaMap[r.obat_id] || 0) + Number(r.jumlah);
+    });
+
     for (const item of rows) {
-        if (item.obat_id) {
-            await sb_kurangiStok(item.obat_id, item.jumlah).catch(() => {});
+        if (!item.obat_id) continue;
+        const jumlahBaru = Number(item.jumlah) || 0;
+        const jumlahLama = lamaMap[item.obat_id] || 0;
+        const selisih    = jumlahBaru - jumlahLama;
+
+        if (selisih > 0) {
+            // Tambah lebih banyak dari sebelumnya → kurangi stok sebesar selisih
+            await sb_kurangiStok(item.obat_id, selisih).catch(() => {});
+        } else if (selisih < 0) {
+            // Dikurangi → kembalikan stok sebesar |selisih|
+            const obat = await sb_getObatById(item.obat_id).catch(() => null);
+            if (obat) {
+                await _sbFetch(`obat?id=eq.${item.obat_id}`, {
+                    method: 'PATCH',
+                    body: { stok: (obat.stok || 0) + Math.abs(selisih) },
+                    prefer: 'return=minimal'
+                }).catch(() => {});
+            }
+        }
+        // Jika selisih = 0, stok tidak perlu diubah
+        delete lamaMap[item.obat_id]; // tandai sudah diproses
+    }
+
+    // Obat yang ada di resep lama tapi tidak ada di resep baru → kembalikan stok penuh
+    for (const [obatId, jumlahLama] of Object.entries(lamaMap)) {
+        const obat = await sb_getObatById(obatId).catch(() => null);
+        if (obat && jumlahLama > 0) {
+            await _sbFetch(`obat?id=eq.${obatId}`, {
+                method: 'PATCH',
+                body: { stok: (obat.stok || 0) + jumlahLama },
+                prefer: 'return=minimal'
+            }).catch(() => {});
         }
     }
 

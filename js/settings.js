@@ -30,76 +30,112 @@ async function _loadUserList() {
 
 // ── Definisi semua modul & sub-modul yang bisa diatur aksesnya ──
 const MODULE_DEFINITIONS = [
-    {
-        id: 'mod_daftar',
-        label: '📋 Daftar Pasien',
-        desc: 'Halaman pendaftaran pasien baru & pencarian pasien'
-    },
-    {
-        id: 'mod_kunjungan',
-        label: '🗓️ Kunjungan Hari Ini',
-        desc: 'Daftar antrian & kunjungan pasien hari ini'
-    },
-    {
-        id: 'mod_pemeriksaan_ttv',
-        label: '💊 Pemeriksaan – Tanda Vital',
-        desc: 'Tekanan darah, nadi, suhu, RR, BB, TB'
-    },
-    {
-        id: 'mod_pemeriksaan_lab',
-        label: '🧪 Pemeriksaan – Laboratorium',
-        desc: 'GDS, Kolesterol, Asam Urat'
-    },
-    {
-        id: 'mod_pemeriksaan_keluhan',
-        label: '🗣️ Pemeriksaan – Keluhan Pasien',
-        desc: 'Form keluhan utama & catatan anamnesa'
-    },
-    {
-        id: 'mod_pemeriksaan_fisik',
-        label: '🩺 Pemeriksaan – Pemeriksaan Fisik',
-        desc: 'Form pemeriksaan fisik umum'
-    },
-    {
-        id: 'mod_diagnosa',
-        label: '📝 Diagnosa & Terapi',
-        desc: 'Input diagnosa ICD-10 dan rencana terapi/obat'
-    },
-    {
-        id: 'mod_riwayat',
-        label: '📂 Riwayat Kunjungan',
-        desc: 'Lihat histori kunjungan & rekam medis lama'
-    },
-    {
-        id: 'mod_settings',
-        label: '⚙️ Pengaturan',
-        desc: 'Akses halaman pengaturan sistem'
-    },
-    {
-        id: 'mod_user',
-        label: '👥 Manajemen User',
-        desc: 'Tambah / edit user & PIN'
-    },
-    {
-        id: 'mod_laporan',
-        label: '📊 Laporan & Statistik',
-        desc: 'Laporan kunjungan per bulan, filter diagnosa & dokter, export CSV'
-    }
+
+    // ══ NAVBAR ══
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_daftar',    label: '📋 Menu: Daftar Pasien',        desc: 'Tampilkan menu Daftar Pasien di navigasi bawah' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_kunjungan', label: '🗓️ Menu: Kunjungan Hari Ini',   desc: 'Tampilkan menu Kunjungan di navigasi bawah' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_laporan',   label: '📊 Menu: Laporan',              desc: 'Tampilkan menu Laporan di navigasi bawah' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_stok',      label: '💊 Menu: Stok Obat',            desc: 'Tampilkan menu Stok Obat di navigasi bawah (jika modul aktif)' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_biaya',     label: '🏷️ Menu: Tarif & Biaya',       desc: 'Tampilkan menu Tarif & Biaya di navigasi bawah (jika modul aktif)' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_settings',  label: '⚙️ Menu: Pengaturan',           desc: 'Tampilkan menu Pengaturan di navigasi bawah' },
+    { group: 'Akses Menu Navigasi', id: 'mod_nav_user',      label: '👥 Menu: Manajemen User',       desc: 'Tampilkan menu User di navigasi bawah' },
+
+    // ══ HALAMAN KUNJUNGAN (card di Hari Ini) ══
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_identitas',       label: '👤 Kunjungan: Identitas Pasien',       desc: 'Tampilkan nama & info dasar pasien di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_ttv',             label: '🩺 Kunjungan: TTV Ringkas',            desc: 'Tampilkan TD, suhu, nadi di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_keluhan',         label: '🗣️ Kunjungan: Keluhan Pasien',        desc: 'Tampilkan keluhan singkat di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_lab',             label: '🔬 Kunjungan: Lab Ringkas',            desc: 'Tampilkan GDS, Kolesterol, Asam Urat di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_diagnosa',        label: '📝 Kunjungan: Diagnosa',               desc: 'Tampilkan diagnosa di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_dokter',          label: '👨‍⚕️ Kunjungan: Diperiksa Oleh',     desc: 'Tampilkan nama dokter pemeriksa di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_status_kunjungan',label: '⏳ Kunjungan: Status (Menunggu/Selesai)', desc: 'Tampilkan badge status kunjungan di card' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_status_obat',     label: '💊 Kunjungan: Status Resep/Obat',      desc: 'Tampilkan & toggle status obat diberikan di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_status_bayar',    label: '💳 Kunjungan: Status Pembayaran',      desc: 'Tampilkan & toggle status bayar di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_btn_invoice',     label: '🧾 Kunjungan: Tombol Invoice',         desc: 'Tampilkan tombol Invoice di card kunjungan' },
+    { group: 'Halaman Kunjungan – Card Pasien', id: 'mod_kunjungan_btn_resep',       label: '💊 Kunjungan: Tombol Resep',           desc: 'Tampilkan tombol Resep di card kunjungan' },
+
+    // ══ MODAL RIWAYAT ══
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_identitas',        label: '👤 Riwayat Modal: Identitas Pasien',    desc: 'Tampilkan nama, tanggal, waktu di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_ttv',              label: '🩺 Riwayat Modal: TTV & Antropometri', desc: 'Tampilkan TD, nadi, suhu, BB, TB, RR di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_alergi',           label: '⚠️ Riwayat Modal: Riwayat Alergi',    desc: 'Tampilkan riwayat alergi di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_keluhan',          label: '🗣️ Riwayat Modal: Keluhan',           desc: 'Tampilkan keluhan di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_fisik',            label: '🩺 Riwayat Modal: Pemeriksaan Fisik', desc: 'Tampilkan hasil pemeriksaan fisik di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_lab',              label: '🔬 Riwayat Modal: Laboratorium',      desc: 'Tampilkan hasil lab di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_diagnosa',         label: '📝 Riwayat Modal: Diagnosa & Terapi', desc: 'Tampilkan diagnosa dan terapi di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_dokter',           label: '👨‍⚕️ Riwayat Modal: Dokter Pemeriksa',desc: 'Tampilkan nama dokter pemeriksa di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_status_kunjungan', label: '⏳ Riwayat Modal: Status Kunjungan',  desc: 'Tampilkan status Menunggu/Selesai di modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_status_bayar',     label: '💳 Riwayat Modal: Status Bayar',      desc: 'Tampilkan & akses invoice dari modal riwayat' },
+    { group: 'Modal Riwayat Kunjungan', id: 'mod_modal_edit',             label: '✏️ Riwayat Modal: Edit Data',         desc: 'Tampilkan tombol Edit di modal riwayat' },
+
+    // ══ HALAMAN PEMERIKSAAN (pageMedis) ══
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_identitas',   label: '👤 Pemeriksaan: Identitas Pasien',      desc: 'Tampilkan banner nama, NIK, umur di halaman pemeriksaan' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_ttv',         label: '🩺 Pemeriksaan: Tanda-Tanda Vital',    desc: 'Section TD, nadi, suhu, RR, BB, TB, alergi' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_anamnesa',    label: '🗣️ Pemeriksaan: Anamnesa (Keluhan)',   desc: 'Section keluhan utama & form anamnesa pasien' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_fisik',       label: '🩺 Pemeriksaan: Pemeriksaan Fisik',    desc: 'Section hasil pemeriksaan fisik umum' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_lab',         label: '🔬 Pemeriksaan: Laboratorium',         desc: 'Section input hasil lab (GDS, kolesterol, dll)' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_diagnosa',    label: '📝 Pemeriksaan: Diagnosa & Terapi',    desc: 'Section diagnosa ICD-10 & rencana terapi / resep obat' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_surat_sakit', label: '📄 Pemeriksaan: Surat Sakit / Sehat', desc: 'Checkbox permintaan surat keterangan sakit/sehat' },
+    { group: 'Halaman Pemeriksaan Medis', id: 'mod_medis_riwayat',     label: '📂 Pemeriksaan: Riwayat Kunjungan',   desc: 'Section riwayat kunjungan sebelumnya di halaman pemeriksaan' },
+
+    // ══ PENGATURAN ══
+    { group: 'Seksi Pengaturan', id: 'mod_settings_klinik',    label: '🏥 Settings: Identitas Klinik',       desc: 'Akses seksi nama, alamat, logo klinik di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_akses',     label: '🔐 Settings: Hak Akses',              desc: 'Akses seksi hak akses per jabatan di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_dokter',    label: '👨‍⚕️ Settings: Data Dokter',          desc: 'Akses seksi data dokter & tenaga medis di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_lab',       label: '🔬 Settings: Lab',                    desc: 'Akses seksi konfigurasi lab aktif di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_stok',      label: '💊 Settings: Stok Obat',              desc: 'Akses seksi modul stok di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_biaya',     label: '🏷️ Settings: Pembiayaan',            desc: 'Akses seksi sistem biaya di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_ai',        label: '🤖 Settings: AI & API Key',           desc: 'Akses seksi konfigurasi AI di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_integrasi', label: '🔗 Settings: Integrasi',              desc: 'Akses seksi OCR & Satu Sehat di Pengaturan' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_user',      label: '👥 Settings: Manajemen User',         desc: 'Akses halaman User (tambah/edit/hapus akun)' },
+    { group: 'Seksi Pengaturan', id: 'mod_settings_laporan',   label: '📊 Settings: Laporan & Statistik',   desc: 'Akses halaman Laporan kunjungan & keuangan' },
 ];
 
-// ── Default akses per jabatan (diisi saat init, bisa di-override dari DB) ──
+// ── Default akses per jabatan ──
+const _ALL_MODS = () => MODULE_DEFINITIONS.map(m => m.id);
+
 const DEFAULT_ACCESS = {
-    'Dokter':    ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
-                  'mod_pemeriksaan_keluhan','mod_pemeriksaan_fisik','mod_diagnosa','mod_riwayat',
-                  'mod_settings','mod_user','mod_laporan'],
-    'Admin':     ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
-                  'mod_pemeriksaan_keluhan','mod_pemeriksaan_fisik','mod_diagnosa','mod_riwayat',
-                  'mod_settings','mod_user','mod_laporan'],
-    'Paramedis': ['mod_daftar','mod_kunjungan','mod_pemeriksaan_ttv','mod_pemeriksaan_lab',
-                  'mod_riwayat'],
-    'Apoteker':  ['mod_daftar','mod_kunjungan','mod_riwayat'],
-    'Kasir':     ['mod_daftar','mod_kunjungan','mod_laporan'],
-    'ATLM':      ['mod_daftar','mod_kunjungan','mod_pemeriksaan_lab','mod_riwayat']
+    'Dokter': _ALL_MODS(), // Dokter akses semua
+    'Admin':  _ALL_MODS(), // Admin akses semua
+
+    'Paramedis': [
+        'mod_nav_daftar','mod_nav_kunjungan',
+        // Kunjungan
+        'mod_kunjungan_identitas','mod_kunjungan_ttv','mod_kunjungan_keluhan',
+        'mod_kunjungan_status_kunjungan','mod_kunjungan_status_obat',
+        // Pemeriksaan
+        'mod_medis_identitas','mod_medis_ttv','mod_medis_anamnesa','mod_medis_fisik',
+        'mod_medis_lab','mod_medis_riwayat',
+        // Modal riwayat
+        'mod_modal_identitas','mod_modal_ttv','mod_modal_alergi','mod_modal_keluhan',
+        'mod_modal_fisik','mod_modal_lab','mod_modal_status_kunjungan',
+    ],
+
+    'Apoteker': [
+        'mod_nav_daftar','mod_nav_kunjungan','mod_nav_stok',
+        // Kunjungan
+        'mod_kunjungan_identitas','mod_kunjungan_status_kunjungan',
+        'mod_kunjungan_status_obat','mod_kunjungan_btn_resep',
+        // Modal riwayat
+        'mod_modal_identitas','mod_modal_diagnosa','mod_modal_status_kunjungan',
+    ],
+
+    'Kasir': [
+        'mod_nav_daftar','mod_nav_kunjungan','mod_nav_biaya','mod_nav_laporan',
+        // Kunjungan
+        'mod_kunjungan_identitas','mod_kunjungan_status_kunjungan',
+        'mod_kunjungan_status_bayar','mod_kunjungan_btn_invoice',
+        // Modal riwayat
+        'mod_modal_identitas','mod_modal_status_kunjungan','mod_modal_status_bayar',
+    ],
+
+    'ATLM': [
+        'mod_nav_daftar','mod_nav_kunjungan',
+        // Kunjungan
+        'mod_kunjungan_identitas','mod_kunjungan_status_kunjungan','mod_kunjungan_lab',
+        // Pemeriksaan
+        'mod_medis_identitas','mod_medis_lab','mod_medis_riwayat',
+        // Modal riwayat
+        'mod_modal_identitas','mod_modal_lab','mod_modal_status_kunjungan',
+    ],
 };
 
 // ── State akses modul yang sedang diedit ──
@@ -200,6 +236,9 @@ function _renderSettingsPage() {
     // FIX: Pasang event listener ke tombol simpan via JS (bukan onclick inline)
     // agar tidak ada konflik tanda kutip di atribut HTML
     _bindSimpanButtons();
+
+    // Terapkan hak akses seksi settings sesuai jabatan yang login
+    _applySettingsSeksiAccess();
 }
 
 function _bindSimpanButtons() {
@@ -678,40 +717,67 @@ function _renderModuleAccess() {
 
     if (_jabatanList.length === 0) {
         c.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px 0;">
-            Belum ada jabatan. Isi dulu kolom "Jabatan yang Tersedia" di atas, lalu simpan seksi Identitas Klinik.
+            Belum ada jabatan. Isi dulu kolom "Jabatan yang Tersedia" di Identitas Klinik lalu simpan.
         </div>`;
         return;
     }
 
+    // Kumpulkan semua group unik
+    const groups = [];
+    MODULE_DEFINITIONS.forEach(m => {
+        if (!groups.includes(m.group)) groups.push(m.group);
+    });
+
     c.innerHTML = _jabatanList.map(jab => {
         const currentMods = _moduleAccess[jab] || [];
+        const jabEscId    = _escId(jab);
+
+        // Render checkbox per group
+        const groupsHtml = groups.map(grp => {
+            const modsInGroup = MODULE_DEFINITIONS.filter(m => m.group === grp);
+            const checkedCount = modsInGroup.filter(m => currentMods.includes(m.id)).length;
+            return `
+            <div style="margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:800;color:var(--primary);text-transform:uppercase;
+                    letter-spacing:.5px;padding:5px 0 6px;border-bottom:1px solid rgba(var(--primary-rgb,37,99,235),0.1);
+                    margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>${grp}</span>
+                    <span style="font-size:9px;background:rgba(var(--primary-rgb,37,99,235),0.1);
+                        color:var(--primary);border-radius:20px;padding:1px 7px;font-weight:700;">
+                        ${checkedCount}/${modsInGroup.length}
+                    </span>
+                </div>
+                <div class="module-checkbox-grid">
+                    ${modsInGroup.map(mod => `
+                    <label class="module-check-item ${currentMods.includes(mod.id) ? 'checked' : ''}">
+                        <input type="checkbox"
+                               id="chk_${jabEscId}_${mod.id}"
+                               ${currentMods.includes(mod.id) ? 'checked' : ''}
+                               onchange="_onModuleCheckChange('${jab}','${mod.id}',this.checked,this)">
+                        <div class="module-check-body">
+                            <div class="module-check-label">${mod.label}</div>
+                            <div class="module-check-desc">${mod.desc}</div>
+                        </div>
+                    </label>`).join('')}
+                </div>
+            </div>`;
+        }).join('');
+
         return `
         <div class="jabatan-access-card">
-          <div class="jabatan-access-title" onclick="toggleJabatanAccess('${_escId(jab)}')">
+          <div class="jabatan-access-title" onclick="toggleJabatanAccess('${jabEscId}')">
             <span>👤 ${jab}</span>
-            <span class="jabatan-acc-count">${currentMods.length} modul aktif</span>
-            <span id="jab_arrow_${_escId(jab)}">▶</span>
+            <span class="jabatan-acc-count" id="jab_count_${jabEscId}">${currentMods.length} akses aktif</span>
+            <span id="jab_arrow_${jabEscId}">▶</span>
           </div>
-          <div id="jab_body_${_escId(jab)}" style="display:none; padding:10px 0 4px;">
+          <div id="jab_body_${jabEscId}" style="display:none;padding:10px 14px 14px;">
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
-              Centang modul yang dapat diakses oleh jabatan <strong>${jab}</strong>:
+              Pilih fitur yang dapat diakses oleh jabatan <strong>${jab}</strong>:
             </div>
-            <div class="module-checkbox-grid">
-              ${MODULE_DEFINITIONS.map(mod => `
-              <label class="module-check-item ${currentMods.includes(mod.id) ? 'checked' : ''}">
-                <input type="checkbox"
-                       id="chk_${_escId(jab)}_${mod.id}"
-                       ${currentMods.includes(mod.id) ? 'checked' : ''}
-                       onchange="_onModuleCheckChange('${jab}', '${mod.id}', this.checked, this)">
-                <div class="module-check-body">
-                  <div class="module-check-label">${mod.label}</div>
-                  <div class="module-check-desc">${mod.desc}</div>
-                </div>
-              </label>`).join('')}
-            </div>
-            <div style="margin-top:10px;display:flex;gap:8px;">
-              <button class="btn-small-secondary" onclick="_pilihSemuaModul('${jab}', true)">✅ Pilih Semua</button>
-              <button class="btn-small-secondary" onclick="_pilihSemuaModul('${jab}', false)">⬜ Kosongkan</button>
+            ${groupsHtml}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-small-secondary" onclick="_pilihSemuaModul('${jab}',true)">✅ Aktifkan Semua</button>
+              <button class="btn-small-secondary" onclick="_pilihSemuaModul('${jab}',false)">⬜ Kosongkan</button>
               <button class="btn-small-secondary" onclick="_resetDefaultModul('${jab}')">🔄 Reset Default</button>
             </div>
           </div>
@@ -738,12 +804,27 @@ function _onModuleCheckChange(jab, modId, checked, checkboxEl) {
     // Update visual state item
     const label = checkboxEl ? checkboxEl.closest('.module-check-item') : null;
     if (label) label.classList.toggle('checked', checked);
-    // Update counter
+    // Update total counter di header jabatan
     const jabEscId = _escId(jab);
-    const countEl  = document.querySelector(`#jab_body_${jabEscId}`)
-                      ?.closest('.jabatan-access-card')
-                      ?.querySelector('.jabatan-acc-count');
-    if (countEl) countEl.textContent = (_moduleAccess[jab] || []).length + ' modul aktif';
+    const countEl  = $(`jab_count_${jabEscId}`);
+    if (countEl) countEl.textContent = (_moduleAccess[jab] || []).length + ' akses aktif';
+    // Update counter per-group (refresh teks di heading group)
+    const mod = MODULE_DEFINITIONS.find(m => m.id === modId);
+    if (mod) {
+        const grpMods = MODULE_DEFINITIONS.filter(m => m.group === mod.group);
+        const grpChecked = grpMods.filter(m => (_moduleAccess[jab] || []).includes(m.id)).length;
+        // Cari elemen span counter group
+        const body = $(`jab_body_${jabEscId}`);
+        if (body) {
+            // Update semua span counter di group headers
+            const headers = body.querySelectorAll('[data-grp-counter]');
+            headers.forEach(el => {
+                if (el.getAttribute('data-grp-counter') === mod.group) {
+                    el.textContent = `${grpChecked}/${grpMods.length}`;
+                }
+            });
+        }
+    }
 }
 
 function _pilihSemuaModul(jab, all) {
@@ -764,69 +845,100 @@ function _resetDefaultModul(jab) {
     showToast(`♻️ Hak akses ${jab} direset ke default`, "info");
 }
 
-// ── Terapkan hak akses ke UI berdasarkan jabatan login ──
+// ── Terapkan hak akses ke seluruh UI berdasarkan jabatan login ──
 function applyModuleAccess(jabatan) {
     let access = _moduleAccess[jabatan];
 
-    // Fallback: coba ambil dari localStorage jika settings belum tersedia
+    // Fallback dari localStorage jika settings belum load
     if (!access) {
         const stored = localStorage.getItem('kp_module_access');
         if (stored) {
-            try {
-                const all = JSON.parse(stored);
-                access = all[jabatan] || null;
-            } catch(e) {}
+            try { const all = JSON.parse(stored); access = all[jabatan] || null; } catch(e) {}
         }
     }
-    if (!access) access = DEFAULT_ACCESS[jabatan] || ['mod_daftar','mod_kunjungan'];
 
-    // ── Navigasi (menu bawah) ──
-    const navMap = {
-        'mod_daftar':    'navDaftar',
-        'mod_kunjungan': 'navHariIni',
-        'mod_laporan':   'navLaporan',
-        'mod_settings':  'navSettings',
-        'mod_user':      'navUser'
-    };
-    Object.entries(navMap).forEach(([modId, navId]) => {
-        const el = $(navId);
-        if (el) el.style.display = access.includes(modId) ? '' : 'none';
-    });
+    // Fallback terakhir ke DEFAULT_ACCESS
+    if (!access) access = DEFAULT_ACCESS[jabatan] || ['mod_nav_daftar','mod_nav_kunjungan'];
 
-    // ── Sub-modul pemeriksaan di halaman pageMedis ──
-    const sectionMap = {
-        'mod_pemeriksaan_keluhan': 'sectionKeluhan',
-        'mod_pemeriksaan_fisik':   'sectionFisik',
-        'mod_pemeriksaan_ttv':     'sectionTTV',
-        'mod_pemeriksaan_lab':     'sectionLab',
-        'mod_diagnosa':            'sectionDiagnosa',
-        'mod_riwayat':             'sectionRiwayat'
-    };
-    Object.entries(sectionMap).forEach(([modId, sectionId]) => {
-        const el = $(sectionId);
-        if (el) el.style.display = access.includes(modId) ? '' : 'none';
-    });
-
-    // ── Simpan window global untuk dipakai modul lain ──
+    // Simpan ke window globals
     window._currentAccess = access;
-    const jabLower = jabatan.toLowerCase();
-    window._isParamedis   = jabLower === 'paramedis';
-    window._isApoteker    = jabLower === 'apoteker';
-    window._isKasir       = jabLower === 'kasir';
-    window._isAtlm        = jabLower === 'atlm';
+    const jL = jabatan.toLowerCase();
+    window._isParamedis = jL === 'paramedis';
+    window._isApoteker  = jL === 'apoteker';
+    window._isKasir     = jL === 'kasir';
+    window._isAtlm      = jL === 'atlm';
 
-    // ── Settings page: hanya Admin & Dokter ──
-    if (['paramedis','apoteker','kasir','atlm'].includes(jabLower) || !access.includes('mod_settings')) {
-        const navSettings = $('navSettings');
-        if (navSettings) navSettings.style.display = 'none';
-    }
+    const has = id => access.includes(id);
 
-    // ── Tombol lanjut periksa (pageDaftar → pageMedis) ──
-    // Kasir dan ATLM tidak perlu akses form pemeriksaan lengkap
+    // ══ NAVBAR ══
+    _setNavVis('navDaftar',   has('mod_nav_daftar'));
+    _setNavVis('navHariIni',  has('mod_nav_kunjungan'));
+    _setNavVis('navLaporan',  has('mod_nav_laporan'));
+    _setNavVis('navSettings', has('mod_nav_settings'));
+    _setNavVis('navUser',     has('mod_nav_user'));
+    // Stok & Biaya: tampil hanya jika KEDUANYA: modul aktif DAN punya hak akses
+    _setNavVis('navStok',  has('mod_nav_stok')  && window._stokAktif  === true);
+    _setNavVis('navBiaya', has('mod_nav_biaya') && window._biayaAktif === true);
+
+    // ══ HALAMAN PEMERIKSAAN (pageMedis sections) ══
+    _setElVis('sectionTTV',      has('mod_medis_ttv'));
+    _setElVis('sectionKeluhan',  has('mod_medis_anamnesa'));
+    _setElVis('sectionFisik',    has('mod_medis_fisik'));
+    _setElVis('sectionLab',      has('mod_medis_lab'));
+    _setElVis('sectionDiagnosa', has('mod_medis_diagnosa'));
+    _setElVis('sectionRiwayat',  has('mod_medis_riwayat'));
+
+    // Surat sakit (di dalam sectionDiagnosa)
+    const suratEl = document.querySelector('#sectionDiagnosa [for="suratSakit"]')?.closest('div');
+    if (suratEl) suratEl.style.display = has('mod_medis_surat_sakit') ? '' : 'none';
+
+    // ══ TOMBOL LANJUT PERIKSA (pageDaftar → pageMedis) ══
     const btnNext = $('btnNext');
-    if (btnNext) {
-        btnNext.style.display = (['kasir','atlm'].includes(jabLower)) ? 'none' : '';
-    }
+    if (btnNext) btnNext.style.display = has('mod_medis_identitas') ? '' : 'none';
+
+    // ══ SETTINGS PAGE: sembunyikan seksi yang tidak diizinkan ══
+    // (diterapkan saat initSettings dipanggil — lihat _applySettingsSeksiAccess)
+    window._settingsAccess = {
+        klinik:    has('mod_settings_klinik'),
+        akses:     has('mod_settings_akses'),
+        dokter:    has('mod_settings_dokter'),
+        lab:       has('mod_settings_lab'),
+        stok:      has('mod_settings_stok'),
+        biaya:     has('mod_settings_biaya'),
+        ai:        has('mod_settings_ai'),
+        integrasi: has('mod_settings_integrasi'),
+    };
+
+    if (typeof window._fitNav === 'function') setTimeout(window._fitNav, 200);
+}
+
+function _setNavVis(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+}
+
+function _setElVis(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+}
+
+// Dipanggil di _renderSettingsPage() setelah accordion dirender
+function _applySettingsSeksiAccess() {
+    const sa = window._settingsAccess || {};
+    const secMap = {
+        sec_klinik:    sa.klinik    !== false,
+        sec_akses:     sa.akses     !== false,
+        sec_dokter:    sa.dokter    !== false,
+        sec_lab:       sa.lab       !== false,
+        sec_stok:      sa.stok      !== false,
+        sec_biaya:     sa.biaya     !== false,
+        sec_ai:        sa.ai        !== false,
+        sec_integrasi: sa.integrasi !== false,
+    };
+    Object.entries(secMap).forEach(([secId, visible]) => {
+        const wrap = document.getElementById(`${secId}_wrap`);
+        if (wrap) wrap.style.display = visible ? '' : 'none';
+    });
 }
 
 // ── Helper escape id ──

@@ -227,43 +227,25 @@ async function sb_checkAndUpsertPasien(payload) {
     }
 
     // ── Ambil atau buat kunjungan hari ini ──
-    // BUG-1 FIX: Selalu cek kunjungan yang sudah ada terlebih dahulu,
-    // baru buat baru jika memang belum ada. Ini lebih aman daripada hanya
-    // mengandalkan UPSERT ignore-duplicates, karena UNIQUE constraint di DB
-    // mungkin belum ada di semua deployment.
+    // BUG-03 FIX: Sebelumnya pakai GET dulu lalu POST — rentan duplikat jika tombol
+    // diklik dua kali sebelum respons pertama datang. Sekarang pakai UPSERT dengan
+    // resolution=ignore-duplicates sehingga insert kedua diabaikan oleh Supabase.
+    // Pastikan tabel kunjungan punya UNIQUE constraint pada (pasien_id, tgl).
     let kunjunganHariIni = null;
     if (createVisitToday && localDate) {
-        // Cek dulu apakah sudah ada kunjungan hari ini
-        const checkExisting = await _sbFetch(
-            `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
-        );
-        if (checkExisting && checkExisting[0]) {
-            // Sudah ada — jangan buat baru, pakai yang sudah ada
-            kunjunganHariIni = checkExisting[0];
+        const upserted = await _sbFetch('kunjungan', {
+            method: 'POST',
+            body: { pasien_id: pasienRow.id, tgl: localDate, waktu: localTime || '00:00', status: 'Menunggu' },
+            prefer: 'resolution=ignore-duplicates,return=representation'
+        });
+        if (upserted && upserted[0]) {
+            kunjunganHariIni = upserted[0];
         } else {
-            // Belum ada — buat baru dengan UPSERT sebagai safety net
-            try {
-                const upserted = await _sbFetch('kunjungan', {
-                    method: 'POST',
-                    body: { pasien_id: pasienRow.id, tgl: localDate, waktu: localTime || '00:00', status: 'Menunggu' },
-                    prefer: 'resolution=ignore-duplicates,return=representation'
-                });
-                if (upserted && upserted[0]) {
-                    kunjunganHariIni = upserted[0];
-                } else {
-                    // Fallback: ambil kembali jika insert diabaikan karena race condition
-                    const fallback = await _sbFetch(
-                        `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
-                    );
-                    kunjunganHariIni = fallback[0] || null;
-                }
-            } catch(e) {
-                // Fallback jika tabel belum punya UNIQUE constraint
-                const fallback = await _sbFetch(
-                    `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
-                );
-                kunjunganHariIni = fallback[0] || null;
-            }
+            // Jika baris sudah ada (ignore-duplicates mengembalikan array kosong), fetch manual
+            const existing = await _sbFetch(
+                `kunjungan?pasien_id=eq.${pasienRow.id}&tgl=eq.${localDate}&limit=1&select=*`
+            );
+            kunjunganHariIni = existing[0] || null;
         }
     }
 
@@ -419,8 +401,13 @@ async function sb_saveKunjungan(payload) {
     const _num = v => (v === '' || v === null || v === undefined) ? null : v;
 
     const isSelesai = diagnosa && terapi;
+    // BUG-A FIX: Jangan sertakan tgl/waktu jika undefined (saat dipanggil dari modal edit
+    // riwayat, localDate & localTime tidak dikirim). Menyertakan undefined akan menimpa
+    // tanggal kunjungan asli dengan NULL di Supabase.
     const body = {
-        pasien_id: pasienId, tgl: localDate, waktu: localTime,
+        pasien_id: pasienId,
+        ...(localDate && { tgl: localDate }),
+        ...(localTime && { waktu: localTime }),
         user_id: userId || null,
         td: td || null,
         nadi:     _num(nadi),

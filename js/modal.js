@@ -74,13 +74,20 @@ function openModal(index) {
     if (!r) return;
     if ($('modalIndex')) $('modalIndex').value = index;
 
-    // ── VIEW: Header tanggal ──
-    if ($('modalTanggalInfoView'))
+    const access = window._currentAccess || [];
+    const hasM   = id => access.length === 0 || access.includes(id);
+
+    // ── VIEW: Header tanggal / identitas
+    if ($('modalTanggalInfoView')) {
         $('modalTanggalInfoView').innerText =
             "📅 " + (r.tgl ? formatTglIndo(r.tgl) : '-') + " (" + (r.waktu || '00:00') + ")";
+        $('modalTanggalInfoView').style.display = hasM('mod_modal_identitas') ? '' : 'none';
+    }
 
     // ── VIEW: TTV ──
-    if ($('viewTtv')) {
+    const ttvViewRow = $('viewTtv')?.closest('.detail-row');
+    if (ttvViewRow) ttvViewRow.style.display = hasM('mod_modal_ttv') ? '' : 'none';
+    if ($('viewTtv') && hasM('mod_modal_ttv')) {
         const tdParts = (r.td || '').split('/');
         const sistol  = tdParts[0] ? tdParts[0].trim() : '-';
         const diastol = tdParts[1] ? tdParts[1].trim() : '-';
@@ -89,26 +96,31 @@ function openModal(index) {
             `<br>RR: ${r.rr||'-'} x/m &nbsp;|&nbsp; BB: ${r.bb||'-'} kg &nbsp;|&nbsp; TB: ${r.tb||'-'} cm`;
     }
 
-    // ── VIEW: Alergi — diambil dari data pasien (permanen), bukan kunjungan ──
+    // ── VIEW: Alergi
     const alergiRow = $('viewAlergiRow');
     const alergiEl  = $('viewAlergi');
     if (alergiRow && alergiEl) {
-        // Cari alergi dari cache allPatients menggunakan currentPasienId
         const pasienCache = (typeof allPatients !== 'undefined' ? allPatients : []);
         const pasienData  = pasienCache.find(p => p.id === currentPasienId);
         const alergiVal   = (pasienData && pasienData.alergi) ? pasienData.alergi.trim() : '';
         alergiEl.innerText      = alergiVal || 'Tidak ada / tidak tercatat';
-        alergiRow.style.display = '';
+        alergiRow.style.display = hasM('mod_modal_alergi') ? '' : 'none';
     }
 
-    // ── VIEW: Keluhan & Fisik ──
+    // ── VIEW: Keluhan
+    const keluhanViewRow = $('viewKeluhan')?.closest('.detail-row');
+    if (keluhanViewRow) keluhanViewRow.style.display = hasM('mod_modal_keluhan') ? '' : 'none';
     if ($('viewKeluhan')) $('viewKeluhan').innerText = r.keluhan || '-';
-    if ($('viewFisik'))   $('viewFisik').innerText   = r.fisik   || '-';
+
+    // ── VIEW: Fisik
+    const fisikViewRow = $('viewFisik')?.closest('.detail-row');
+    if (fisikViewRow) fisikViewRow.style.display = hasM('mod_modal_fisik') ? '' : 'none';
+    if ($('viewFisik')) $('viewFisik').innerText = r.fisik || '-';
 
     // ── VIEW: Lab ──
     const labRow = $('viewLabRow');
     const hasLab = r.lab_gds || r.lab_chol || r.lab_ua;
-    if (labRow) labRow.style.display = hasLab ? '' : 'none';
+    if (labRow) labRow.style.display = (hasM('mod_modal_lab') && hasLab) ? '' : 'none';
     if ($('viewLab')) $('viewLab').innerHTML = hasLab
         ? `GDS: ${r.lab_gds||'-'} mg/dL &nbsp;|&nbsp; Kolesterol: ${r.lab_chol||'-'} mg/dL &nbsp;|&nbsp; Asam Urat: ${r.lab_ua||'-'} mg/dL`
         : '-';
@@ -116,12 +128,14 @@ function openModal(index) {
     // ── VIEW: Diagnosa & Terapi ──
     if ($('viewDiag'))   $('viewDiag').innerText  = r.diag   || '-';
     if ($('viewTerapi')) $('viewTerapi').innerText = r.terapi || '-';
+    if ($('viewDiagRow'))   $('viewDiagRow').style.display   = hasM('mod_modal_diagnosa') ? '' : 'none';
+    if ($('viewTerapiRow')) $('viewTerapiRow').style.display  = hasM('mod_modal_diagnosa') ? '' : 'none';
 
     // ── VIEW: Dokter Pemeriksa ──
     const dokterRow = $('viewDokterRow');
     const dokterEl  = $('viewDokterPemeriksa');
     if (dokterEl && dokterRow) {
-        if (r.dokterNama) {
+        if (hasM('mod_modal_dokter') && r.dokterNama) {
             dokterEl.innerText      = r.dokterNama;
             dokterRow.style.display = '';
         } else {
@@ -129,18 +143,19 @@ function openModal(index) {
         }
     }
 
-    // ── ROLE: Paramedis tidak bisa lihat Diagnosa & Terapi ──
-    const isParamedis = window._isParamedis === true;
-    if ($('viewDiagRow'))   $('viewDiagRow').style.display   = isParamedis ? 'none' : '';
-    if ($('viewTerapiRow')) $('viewTerapiRow').style.display  = isParamedis ? 'none' : '';
-
     // ── CEK HAK AKSES EDIT ──
     const hakEdit = _cekHakAksesEdit(r);
     const lockNotif  = $('editLockNotif');
     const lockMsg    = $('editLockMsg');
     const btnEdit    = $('btnToggleEdit');
 
-    if (hakEdit.boleh) {
+    // Edit hanya jika punya mod_modal_edit
+    const canEditByAccess = hasM('mod_modal_edit');
+
+    if (!canEditByAccess) {
+        if (btnEdit) btnEdit.style.display = 'none';
+        if (lockNotif) lockNotif.style.display = 'none';
+    } else if (hakEdit.boleh) {
         if (lockNotif) lockNotif.style.display = 'none';
         if (btnEdit) {
             btnEdit.style.display  = '';
@@ -200,17 +215,17 @@ function openModal(index) {
     }
     if ($('modalTerapi')) $('modalTerapi').value = r.terapi || '';
 
-    // Sembunyikan seksi Diagnosa untuk Paramedis di mode edit
+    // Sembunyikan seksi Diagnosa jika tidak punya akses
     const editDiagSection = $('modalEditDiagSection');
-    if (editDiagSection) editDiagSection.style.display = isParamedis ? 'none' : '';
+    if (editDiagSection) editDiagSection.style.display = hasM('mod_modal_diagnosa') ? '' : 'none';
 
     toggleEditModal(false);
 
-    // Invoice button: tampil hanya jika modul biaya aktif & kunjungan punya ID
+    // Invoice button: tampil hanya jika modul biaya aktif, kunjungan punya ID, dan punya hak akses mod_modal_status_bayar
     const invRow = $('viewInvoiceRow');
     if (invRow) {
         const biayaAktif = window._biayaAktif === true;
-        invRow.style.display = (biayaAktif && r.id) ? '' : 'none';
+        invRow.style.display = (biayaAktif && r.id && hasM('mod_modal_status_bayar')) ? '' : 'none';
         window._modalCurrentKunjId     = r.id  || null;
         window._modalCurrentPasienNama = (typeof allPatients !== 'undefined')
             ? (allPatients.find(p => p.id === currentPasienId)?.nama || '')
@@ -256,10 +271,9 @@ async function simpanEditModal() {
         return showToast("⛔ " + hakEdit.alasan, "error");
     }
 
-    const d1 = $('modalDiag1') ? $('modalDiag1').value.trim() : '';
-    const d2 = $('modalDiag2') ? $('modalDiag2').value.trim() : '';
-    // BUG FIX: Simpan diagnosa dan diagnosa2 sebagai kolom terpisah
-    // (format lama "d1 | d2" masih disimpan di 'diagnosa' sebagai fallback kompatibilitas)
+    const d1 = $('modalDiag1') ? $('modalDiag1').value : '';
+    const d2 = $('modalDiag2') ? $('modalDiag2').value : '';
+    const diagGabung = d2 ? (d1 + " | " + d2) : d1;
 
     // Gabungkan sistol/diastol ke format "120/80"
     const sistol  = $('modalSistol')  ? $('modalSistol').value.trim()  : '';
@@ -281,8 +295,7 @@ async function simpanEditModal() {
         lab_gds:  $('modalLabGds')  ? $('modalLabGds').value  : '',
         lab_chol: $('modalLabChol') ? $('modalLabChol').value : '',
         lab_ua:   $('modalLabUa')   ? $('modalLabUa').value   : '',
-        diagnosa: d1,
-        diagnosa2: d2,
+        diagnosa: diagGabung,
         terapi:   $('modalTerapi')  ? $('modalTerapi').value  : ''
     };
 
@@ -317,14 +330,12 @@ async function simpanEditModal() {
             bb:       payload.bb,       tb:       payload.tb,
             lab_gds:  payload.lab_gds,  lab_chol: payload.lab_chol,
             lab_ua:   payload.lab_ua,
-            diag:     d1,
-            diagnosa2: d2,
-            terapi:   payload.terapi
+            diag:     payload.diagnosa, terapi:   payload.terapi
         });
 
         // BUG-08 FIX: Update status ke "Selesai" jika diagnosa & terapi sudah diisi,
         // baik di cache riwayat maupun di array kunjunganHariIni.
-        const isSelesai = !!(d1 && payload.terapi);
+        const isSelesai = !!(payload.diagnosa && payload.terapi);
         if (isSelesai) {
             r.status = 'Selesai';
             if (typeof kunjunganHariIni !== 'undefined') {
