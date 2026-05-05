@@ -411,8 +411,9 @@
 
                     if (typeof showToast === 'function') showToast('✅ Rekam medis berhasil disimpan!', 'success');
 
-                    // Buka modal tagihan jika modul biaya aktif
-                    if (window._biayaAktif && currentKunjunganId && typeof openModalTagihan === 'function') {
+                    // Buka modal tagihan jika modul biaya aktif DAN diagnosa sudah diisi
+                    // BUG-D FIX: sebelumnya tagihan muncul bahkan saat diagnosa kosong
+                    if (window._biayaAktif && currentKunjunganId && diag1 && typeof openModalTagihan === 'function') {
                         try {
                             const namaDisplay = $('infoPasienNama') ? $('infoPasienNama').innerText : payload.nama;
                             await openModalTagihan(currentKunjunganId, currentPasienId, namaDisplay, localDate, payload);
